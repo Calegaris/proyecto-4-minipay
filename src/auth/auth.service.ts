@@ -178,21 +178,22 @@ export class AuthService {
           where: { id: record.id },
           data: { revokedAt: new Date() },
         });
-        break;
       }
     }
+
 
     return { message: 'Sesión cerrada con éxito' };
   }
 
   private async generateAndSaveTokens(userId: string, email: string) {
-    const payload = { sub: userId, email };
+    const payload = { sub: userId, email, jti: crypto.randomUUID() };
 
     const accessToken = this.jwtService.sign(payload, {
       secret: this.configService.get<string>('JWT_SECRET'),
       expiresIn: (this.configService.get<string>('JWT_EXPIRES_IN') ??
         '15m') as any,
     });
+
 
     const refreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET');
     const refreshExpiresIn =
