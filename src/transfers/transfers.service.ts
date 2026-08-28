@@ -5,9 +5,10 @@ import {
   ConflictException,
   ForbiddenException,
 } from '@nestjs/common';
-import { TransferStatus, TransactionType } from '@prisma/client';
+import { TransferStatus, TransactionType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateTransferDto } from './dto';
+import { CreateTransferDto, TransferQueryDto } from './dto';
+
 
 @Injectable()
 export class TransfersService {
@@ -178,39 +179,64 @@ export class TransfersService {
     return transfer;
   }
 
-  async getTransfers(userId: string) {
+  async getTransfers(userId: string, query: TransferQueryDto = new TransferQueryDto()) {
     const wallet = await this.prisma.wallet.findUnique({
       where: { userId },
     });
+
 
     if (!wallet) {
       throw new NotFoundException('Billetera no encontrada');
     }
 
-    const transfers = await this.prisma.transfer.findMany({
-      where: {
-        OR: [
-          { senderWalletId: wallet.id },
-          { receiverWalletId: wallet.id },
-        ],
-      },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        senderWallet: {
-          select: {
-            id: true,
-            user: { select: { id: true, name: true, email: true } },
-          },
-        },
-        receiverWallet: {
-          select: {
-            id: true,
-            user: { select: { id: true, name: true, email: true } },
-          },
-        },
-      },
-    });
+    const { page = 1, limit = 10, status } = query;
+    const skip = (page - 1) * limit;
 
-    return transfers;
+    const where: Prisma.TransferWhereInput = {
+      OR: [
+        { senderWalletId: wallet.id },
+        { receiverWalletId: wallet.id },
+      ],
+      ...(status ? { status } : {}),
+    };
+
+    const [transfers, total] = await this.prisma.$transaction([
+      this.prisma.transfer.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          senderWallet: {
+            select: {
+              id: true,
+              user: { select: { id: true, name: true, email: true } },
+            },
+          },
+          receiverWallet: {
+            select: {
+              id: true,
+              user: { select: { id: true, name: true, email: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.transfer.count({ where }),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data: transfers,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    };
   }
 }
+

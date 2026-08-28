@@ -204,16 +204,22 @@ describe('TransfersModule (e2e)', () => {
     });
   });
 
-  describe('GET /transfers (Listado)', () => {
-    it('debe listar las transferencias del usuario autenticado', async () => {
+  describe('GET /transfers (Listado Paginado)', () => {
+    it('debe listar las transferencias paginadas del usuario autenticado', async () => {
       const response = await request(app.getHttpServer())
-        .get('/transfers')
+        .get('/transfers?page=1&limit=5')
         .set('Authorization', `Bearer ${senderToken}`)
         .expect(200);
 
-      expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body.length).toBeGreaterThanOrEqual(1);
-      expect(response.body[0].id).toBe(createdTransferId);
+      expect(response.body).toHaveProperty('data');
+      expect(response.body).toHaveProperty('meta');
+      expect(Array.isArray(response.body.data)).toBe(true);
+      expect(response.body.data.length).toBeGreaterThanOrEqual(1);
+      expect(response.body.data[0].id).toBe(createdTransferId);
+      expect(response.body.meta).toHaveProperty('total');
+      expect(response.body.meta.page).toBe(1);
+      expect(response.body.meta.limit).toBe(5);
     });
   });
+
 });
