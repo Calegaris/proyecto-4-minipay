@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { TransactionType } from '@prisma/client';
+import { TransactionType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { DepositDto } from './dto';
+import { DepositDto, TransactionQueryDto } from './dto';
 
 @Injectable()
 export class WalletsService {
@@ -52,14 +52,39 @@ export class WalletsService {
     return result;
   }
 
-  async getTransactions(userId: string) {
+  async getTransactions(userId: string, query: TransactionQueryDto = new TransactionQueryDto()) {
     const wallet = await this.getWallet(userId);
+    const { page = 1, limit = 10, type } = query;
 
-    const transactions = await this.prisma.transaction.findMany({
-      where: { walletId: wallet.id },
-      orderBy: { createdAt: 'desc' },
-    });
+    const skip = (page - 1) * limit;
 
-    return transactions;
+    const where: Prisma.TransactionWhereInput = {
+      walletId: wallet.id,
+      ...(type ? { type } : {}),
+    };
+
+    const [transactions, total] = await this.prisma.$transaction([
+      this.prisma.transaction.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.transaction.count({ where }),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data: transactions,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    };
   }
 }
