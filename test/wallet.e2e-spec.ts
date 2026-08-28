@@ -3,6 +3,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { cleanupTestUsers } from './test-utils';
 
 describe('WalletsModule (e2e)', () => {
   let app: INestApplication;
@@ -34,9 +35,7 @@ describe('WalletsModule (e2e)', () => {
     prisma = app.get(PrismaService);
 
     // Limpieza previa
-    await prisma.user.deleteMany({
-      where: { email: walletUser.email },
-    });
+    await cleanupTestUsers(prisma, [walletUser.email]);
 
     // Registrar y autenticar usuario para pruebas de billetera
     const regResponse = await request(app.getHttpServer())
@@ -48,11 +47,10 @@ describe('WalletsModule (e2e)', () => {
 
   afterAll(async () => {
     // Limpieza posterior
-    await prisma.user.deleteMany({
-      where: { email: walletUser.email },
-    });
+    await cleanupTestUsers(prisma, [walletUser.email]);
     await app.close();
   });
+
 
   describe('GET /wallet', () => {
     it('debe rechazar el acceso con 401 si no se envía token de autenticación', async () => {

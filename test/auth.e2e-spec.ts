@@ -3,6 +3,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { cleanupTestUsers } from './test-utils';
 
 describe('AuthModule (e2e)', () => {
   let app: INestApplication;
@@ -36,18 +37,15 @@ describe('AuthModule (e2e)', () => {
     prisma = app.get(PrismaService);
 
     // Limpieza previa de usuario de prueba si existiera
-    await prisma.user.deleteMany({
-      where: { email: testUser.email },
-    });
+    await cleanupTestUsers(prisma, [testUser.email]);
   });
 
   afterAll(async () => {
     // Limpieza posterior
-    await prisma.user.deleteMany({
-      where: { email: testUser.email },
-    });
+    await cleanupTestUsers(prisma, [testUser.email]);
     await app.close();
   });
+
 
   describe('POST /auth/register', () => {
     it('debe registrar un nuevo usuario con su billetera y retornar tokens', async () => {
