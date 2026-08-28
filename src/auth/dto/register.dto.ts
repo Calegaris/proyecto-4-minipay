@@ -1,3 +1,4 @@
+import { ApiProperty } from '@nestjs/swagger';
 import {
   IsEmail,
   IsNotEmpty,
@@ -7,20 +8,35 @@ import {
 } from 'class-validator';
 
 export class RegisterDto {
+  @ApiProperty({
+    example: 'Lucas Test',
+    description: 'Nombre completo del usuario',
+  })
   @IsString({ message: 'El nombre debe ser una cadena de texto' })
-  @IsNotEmpty({ message: 'El nombre es obligatorio' })
+  @IsNotEmpty({ message: 'El nombre no puede estar vacío' })
   name: string;
 
+  @ApiProperty({
+    example: 'lucas@test.com',
+    description: 'Correo electrónico único',
+  })
   @IsEmail({}, { message: 'El formato del email no es válido' })
-  @IsNotEmpty({ message: 'El email es obligatorio' })
+  @IsNotEmpty({ message: 'El email no puede estar vacío' })
   email: string;
 
-  @IsString({ message: 'La contraseña debe ser una cadena de texto' })
-  @IsNotEmpty({ message: 'La contraseña es obligatoria' })
-  @MinLength(8, { message: 'La contraseña debe tener al menos 8 caracteres' })
-  @Matches(/((?=.*\d)|(?=.*\W+))(?![.\n])(?=.*[A-Z])(?=.*[a-z]).*$/, {
-    message:
-      'La contraseña debe contener al menos una mayúscula, una minúscula y un número',
+  @ApiProperty({
+    example: 'Password123!',
+    description:
+      'Contraseña de al menos 8 caracteres con mayúscula, minúscula, número y carácter especial',
   })
+  @IsString({ message: 'La contraseña debe ser una cadena de texto' })
+  @MinLength(8, { message: 'La contraseña debe tener al menos 8 caracteres' })
+  @Matches(
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
+    {
+      message:
+        'La contraseña debe contener al menos una mayúscula, una minúscula, un número y un carácter especial',
+    },
+  )
   password: string;
 }
