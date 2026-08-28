@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -27,6 +28,10 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  // 4. Filtro global de excepciones y normalización de respuestas de error
+  app.useGlobalFilters(new AllExceptionsFilter());
+
 
   // 4. Documentación interactiva OpenAPI / Swagger
   const swaggerConfig = new DocumentBuilder()
