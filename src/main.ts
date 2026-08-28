@@ -1,9 +1,10 @@
-import { ValidationPipe } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
+import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { SanitizeResponseInterceptor } from './common/interceptors/sanitize-response.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -32,8 +33,15 @@ async function bootstrap() {
   // 4. Filtro global de excepciones y normalización de respuestas de error
   app.useGlobalFilters(new AllExceptionsFilter());
 
+  // 5. Interceptores globales: serialización y depuración automática de datos sensibles
+  const reflector = app.get(Reflector);
+  app.useGlobalInterceptors(
+    new ClassSerializerInterceptor(reflector),
+    new SanitizeResponseInterceptor(),
+  );
 
-  // 4. Documentación interactiva OpenAPI / Swagger
+  // 6. Documentación interactiva OpenAPI / Swagger
+
   const swaggerConfig = new DocumentBuilder()
     .setTitle('MiniPay Wallet API')
     .setDescription(
