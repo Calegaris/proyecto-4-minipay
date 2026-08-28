@@ -1,0 +1,41 @@
+
+# Definición de los servicios (contenedores) que se ejecutarán
+services:
+  # Servicio 1: Base de datos relacional PostgreSQL
+  db:
+    # Imagen oficial de PostgreSQL 16 sobre Alpine Linux (más ligera y rápida de descargar)
+    image: postgres:16-alpine
+    # Nombre asignado al contenedor para identificarlo fácilmente en Docker
+    container_name: minipay-postgres
+    # Reinicia el contenedor automáticamente si falla o tras reiniciar Docker/el sistema
+    restart: always
+    # Variables de entorno para la configuración inicial de PostgreSQL
+    environment:
+      - POSTGRES_USER=minipay              # Usuario principal de la base de datos
+      - POSTGRES_PASSWORD=adminminipay123  # Contraseña del usuario
+      - POSTGRES_DB=minipay                # Nombre de la base de datos a crear por defecto
+    # Mapeo de puertos: [puerto_host]:[puerto_contenedor]
+    # Mapea el puerto 5434 de tu máquina local al 5432 (estándar de Postgres) del contenedor
+    # (Esto evita conflictos si ya tienes otra instancia de Postgres corriendo localmente en el 5432)
+    ports:
+      - "5433:5432"
+    # Persistencia de datos: asocia el volumen 'postgres_data' con la ruta interna donde Postgres guarda los datos
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Servicio 2: Adminer (interfaz web liviana para administrar y consultar la base de datos)
+  adminer:
+    # Imagen oficial más reciente de Adminer
+    image: adminer:latest
+    # Reinicia el contenedor automáticamente
+    restart: always
+    # Expone la interfaz web en http://localhost:8080 en tu navegador
+    ports:
+      - "8080:8080"
+
+# Declaración de volúmenes nombrados para almacenar datos de forma persistente
+volumes:
+  # Volumen para conservar la información de PostgreSQL incluso al detener o borrar contenedores
+  postgres_data:
+    driver: local
+
