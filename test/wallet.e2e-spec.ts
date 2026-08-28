@@ -97,16 +97,22 @@ describe('WalletsModule (e2e)', () => {
   });
 
   describe('GET /wallet/transactions', () => {
-    it('debe listar las transacciones de la billetera del usuario', async () => {
+    it('debe listar las transacciones paginadas de la billetera del usuario', async () => {
       const response = await request(app.getHttpServer())
-        .get('/wallet/transactions')
+        .get('/wallet/transactions?page=1&limit=5')
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
 
-      expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body.length).toBeGreaterThanOrEqual(1);
-      expect(response.body[0]).toHaveProperty('type', 'DEPOSIT');
-      expect(response.body[0]).toHaveProperty('amount', '5000');
+      expect(response.body).toHaveProperty('data');
+      expect(response.body).toHaveProperty('meta');
+      expect(Array.isArray(response.body.data)).toBe(true);
+      expect(response.body.data.length).toBeGreaterThanOrEqual(1);
+      expect(response.body.data[0]).toHaveProperty('type', 'DEPOSIT');
+      expect(response.body.data[0]).toHaveProperty('amount', '5000');
+      expect(response.body.meta).toHaveProperty('total');
+      expect(response.body.meta.page).toBe(1);
+      expect(response.body.meta.limit).toBe(5);
     });
   });
 });
+

@@ -5,6 +5,7 @@ import {
   Body,
   Param,
   Headers,
+  Query,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -18,9 +19,10 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { TransfersService } from './transfers.service';
-import { CreateTransferDto } from './dto';
+import { CreateTransferDto, TransferQueryDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+
 
 @ApiTags('Transfers')
 @ApiBearerAuth('JWT-auth')
@@ -117,18 +119,22 @@ export class TransfersController {
   @ApiOperation({
     summary: 'Consultar historial de transferencias',
     description:
-      'Lista todas las transferencias enviadas y recibidas por el usuario autenticado.',
+      'Lista las transferencias enviadas y recibidas por el usuario autenticado, con soporte para paginación (page, limit) y filtros por estado (PENDING, COMPLETED, FAILED).',
   })
   @ApiResponse({
     status: 200,
-    description: 'Historial de transferencias obtenido exitosamente',
+    description: 'Historial paginado de transferencias obtenido exitosamente',
   })
   @ApiResponse({
     status: 401,
     description: 'No autorizado',
   })
-  async getTransfers(@CurrentUser('id') userId: string) {
-    return this.transfersService.getTransfers(userId);
+  async getTransfers(
+    @CurrentUser('id') userId: string,
+    @Query() query: TransferQueryDto,
+  ) {
+    return this.transfersService.getTransfers(userId, query);
   }
 }
+
 

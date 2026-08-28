@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Body,
+  Query,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -14,9 +15,10 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { WalletsService } from './wallets.service';
-import { DepositDto } from './dto';
+import { DepositDto, TransactionQueryDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+
 
 @ApiTags('Wallet')
 @ApiBearerAuth('JWT-auth')
@@ -71,18 +73,23 @@ export class WalletsController {
   @Get('transactions')
   @ApiOperation({
     summary: 'Consultar historial de movimientos',
-    description: 'Obtiene todos los registros y transacciones de la billetera ordenados por fecha descendente.',
+    description:
+      'Obtiene las transacciones de la billetera con soporte para paginación (page, limit) y filtros por tipo (DEPOSIT, TRANSFER_SENT, TRANSFER_RECEIVED).',
   })
   @ApiResponse({
     status: 200,
-    description: 'Lista de transacciones obtenida exitosamente',
+    description: 'Lista paginada de transacciones obtenida exitosamente',
   })
   @ApiResponse({
     status: 401,
     description: 'No autorizado',
   })
-  async getTransactions(@CurrentUser('id') userId: string) {
-    return this.walletsService.getTransactions(userId);
+  async getTransactions(
+    @CurrentUser('id') userId: string,
+    @Query() query: TransactionQueryDto,
+  ) {
+    return this.walletsService.getTransactions(userId, query);
   }
 }
+
 
