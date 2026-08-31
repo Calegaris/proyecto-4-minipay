@@ -9,6 +9,7 @@ import { AuthModule } from './auth/auth.module';
 import { WalletsModule } from './wallets/wallets.module';
 import { TransfersModule } from './transfers/transfers.module';
 import { UsersModule } from './users/users.module';
+import { ContactsModule } from './contacts/contacts.module';
 
 @Module({
   imports: [
@@ -30,7 +31,9 @@ import { UsersModule } from './users/users.module';
     WalletsModule,
     TransfersModule,
     UsersModule,
+    ContactsModule,
   ],
+
 
   controllers: [AppController],
   providers: [
