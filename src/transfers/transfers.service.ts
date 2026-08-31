@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { TransferStatus, TransactionType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -104,7 +105,7 @@ export class TransfersService {
       );
     }
 
-    // 4. Buscar billetera del remitente y verificar saldo
+    // 4. Buscar billetera del remitente y verificar saldo disponible
     const senderWallet = await this.prisma.wallet.findUnique({
       where: { userId: senderUserId },
     });
@@ -119,10 +120,36 @@ export class TransfersService {
       );
     }
 
-
-    // 5. Transacción atómica: Débito, Crédito, Creación de Transferencia y Movimientos
+    // 5. Transacción atómica: Control de Riesgo Diario, Débito, Crédito, Creación de Transferencia y Movimientos
     const transfer = await this.prisma.$transaction(async (tx) => {
-      // Descontar saldo del remitente
+      // 5.1. Control de Riesgo: Calcular acumulación diaria de transferencias en UTC
+      const startOfDay = new Date();
+      startOfDay.setUTCHours(0, 0, 0, 0);
+
+      const dailyAggregate = await tx.transfer.aggregate({
+        where: {
+          senderWalletId: senderWallet.id,
+          status: TransferStatus.COMPLETED,
+          createdAt: { gte: startOfDay },
+        },
+        _sum: { amount: true },
+      });
+
+      const totalSentToday =
+        dailyAggregate._sum.amount ?? new Prisma.Decimal(0);
+      const amountDecimal = new Prisma.Decimal(amount);
+      const remainingLimit = Prisma.Decimal.sub(
+        senderWallet.dailyTransferLimit,
+        totalSentToday,
+      );
+
+      if (amountDecimal.greaterThan(remainingLimit)) {
+        throw new UnprocessableEntityException(
+          `Límite operativo diario excedido. Cupo disponible restante: $${remainingLimit.toFixed(2)} ARS`,
+        );
+      }
+
+      // 5.2. Descontar saldo del remitente
       await tx.wallet.update({
         where: { id: senderWallet.id },
         data: {
@@ -132,7 +159,7 @@ export class TransfersService {
         },
       });
 
-      // Acreditar saldo al destinatario
+      // 5.3. Acreditar saldo al destinatario
       await tx.wallet.update({
         where: { id: receiverWallet.id },
         data: {
@@ -141,6 +168,7 @@ export class TransfersService {
           },
         },
       });
+
 
       // Crear registro principal de Transferencia
       const newTransfer = await tx.transfer.create({

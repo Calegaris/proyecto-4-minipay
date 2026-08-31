@@ -69,7 +69,12 @@ export class TransfersController {
     status: 409,
     description: 'Saldo insuficiente para completar la transferencia',
   })
+  @ApiResponse({
+    status: 422,
+    description: 'Límite operativo diario de transferencias excedido',
+  })
   async createTransfer(
+
     @CurrentUser('id') userId: string,
     @Body() createTransferDto: CreateTransferDto,
     @Headers('idempotency-key') idempotencyKey?: string,
