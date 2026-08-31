@@ -30,7 +30,9 @@ describe('TransfersModule (e2e)', () => {
   let senderToken: string;
   let thirdPartyToken: string;
   let createdTransferId: string;
+  let receiverWallet: any;
   const idempotencyKey = 'transfer-key-test-12345';
+
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -68,9 +70,10 @@ describe('TransfersModule (e2e)', () => {
       .send({ amount: 10000 });
 
     // 2. Registrar Receiver
-    await request(app.getHttpServer())
+    const receiverReg = await request(app.getHttpServer())
       .post('/auth/register')
       .send(receiverUser);
+    receiverWallet = receiverReg.body.user.wallet;
 
     // 3. Registrar Third Party User
     const thirdPartyReg = await request(app.getHttpServer())
@@ -78,6 +81,7 @@ describe('TransfersModule (e2e)', () => {
       .send(thirdPartyUser);
     thirdPartyToken = thirdPartyReg.body.tokens.accessToken;
   });
+
 
   afterAll(async () => {
     // Limpieza posterior
@@ -184,6 +188,34 @@ describe('TransfersModule (e2e)', () => {
         })
         .expect(404);
     });
+
+    it('debe permitir transferir dinero utilizando el Alias del destinatario', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/transfers')
+        .set('Authorization', `Bearer ${senderToken}`)
+        .send({
+          recipientAlias: receiverWallet.alias,
+          amount: 500,
+        })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('id');
+      expect(response.body.amount).toBe('500');
+    });
+
+    it('debe permitir transferir dinero utilizando el CVU del destinatario', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/transfers')
+        .set('Authorization', `Bearer ${senderToken}`)
+        .send({
+          recipientCvu: receiverWallet.cvu,
+          amount: 500,
+        })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('id');
+      expect(response.body.amount).toBe('500');
+    });
   });
 
   describe('GET /transfers/:id (Autorización)', () => {
@@ -215,11 +247,12 @@ describe('TransfersModule (e2e)', () => {
       expect(response.body).toHaveProperty('meta');
       expect(Array.isArray(response.body.data)).toBe(true);
       expect(response.body.data.length).toBeGreaterThanOrEqual(1);
-      expect(response.body.data[0].id).toBe(createdTransferId);
+      expect(response.body.data.some((t: any) => t.id === createdTransferId)).toBe(true);
       expect(response.body.meta).toHaveProperty('total');
       expect(response.body.meta.page).toBe(1);
       expect(response.body.meta.limit).toBe(5);
     });
   });
+
 
 });
