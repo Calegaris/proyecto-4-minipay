@@ -216,7 +216,41 @@ describe('TransfersModule (e2e)', () => {
       expect(response.body).toHaveProperty('id');
       expect(response.body.amount).toBe('500');
     });
+
+    it('debe rechazar transferencias que excedan el límite operativo diario con 422 Unprocessable Entity', async () => {
+      const senderDbUser = await prisma.user.findUnique({
+        where: { email: senderUser.email },
+        include: { wallet: true },
+      });
+
+      // Ajustamos temporalmente el límite diario a $1.000 ARS
+      await prisma.wallet.update({
+        where: { id: senderDbUser!.wallet!.id },
+        data: { dailyTransferLimit: 1000.0 },
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/transfers')
+        .set('Authorization', `Bearer ${senderToken}`)
+        .send({
+          recipientEmail: receiverUser.email,
+          amount: 1500,
+        })
+        .expect(422);
+
+      expect(response.body.message).toContain(
+        'Límite operativo diario excedido',
+      );
+      expect(response.body.message).toContain('Cupo disponible restante');
+
+      // Restaurar el límite por defecto a $100.000 ARS
+      await prisma.wallet.update({
+        where: { id: senderDbUser!.wallet!.id },
+        data: { dailyTransferLimit: 100000.0 },
+      });
+    });
   });
+
 
   describe('GET /transfers/:id (Autorización)', () => {
     it('el remitente debe poder consultar el detalle de su transferencia', async () => {
