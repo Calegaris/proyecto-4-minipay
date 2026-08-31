@@ -23,7 +23,7 @@ async function main() {
 
   console.log('🧹 Tablas limpiadas.');
 
-  // 2. Crear Usuarios de prueba con sus billeteras
+  // 2. Crear Usuarios de prueba con sus billeteras (incluyendo Alias y CVU)
   const userLucas = await prisma.user.create({
     data: {
       name: 'Lucas Dev',
@@ -33,6 +33,8 @@ async function main() {
         create: {
           balance: 20000, // 25000 inicial - 5000 transferidos
           currency: 'ARS',
+          alias: 'lucas.dev.mp',
+          cvu: '0000045600000000000001',
         },
       },
     },
@@ -48,6 +50,8 @@ async function main() {
         create: {
           balance: 15000, // 10000 inicial + 5000 recibidos
           currency: 'ARS',
+          alias: 'juan.perez.mp',
+          cvu: '0000045600000000000002',
         },
       },
     },
@@ -63,13 +67,18 @@ async function main() {
         create: {
           balance: 5000,
           currency: 'ARS',
+          alias: 'maria.gomez.mp',
+          cvu: '0000045600000000000003',
         },
       },
     },
     include: { wallet: true },
   });
 
-  console.log('👤 Usuarios creados: Lucas (lucas@minipay.com), Juan (juan@minipay.com), María (maria@minipay.com).');
+  console.log('👤 Usuarios creados:');
+  console.log('   - Lucas: lucas@minipay.com | Alias: lucas.dev.mp | CVU: 0000045600000000000001');
+  console.log('   - Juan:  juan@minipay.com  | Alias: juan.perez.mp | CVU: 0000045600000000000002');
+  console.log('   - María: maria@minipay.com | Alias: maria.gomez.mp | CVU: 0000045600000000000003');
 
   // 3. Registrar Depósitos Iniciales en el Ledger de Transacciones
   if (userLucas.wallet) {
@@ -139,8 +148,7 @@ async function main() {
   }
 
   console.log('✅ Base de datos poblada exitosamente.');
-  console.log('🔑 Credenciales para todos los usuarios de prueba:');
-  console.log('   - Password: Password123!');
+  console.log('🔑 Credenciales para todos los usuarios de prueba: Password123!');
 }
 
 main()
