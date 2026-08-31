@@ -46,6 +46,8 @@ model Wallet {
   userId            String        @unique
   balance           Decimal       @default(0.0) @db.Decimal(12, 2)
   currency          String        @default("ARS")
+  alias             String        @unique
+  cvu               String        @unique @db.VarChar(22)
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
   user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -53,8 +55,11 @@ model Wallet {
   sentTransfers     Transfer[]    @relation("SentTransfers")
   receivedTransfers Transfer[]    @relation("ReceivedTransfers")
 
+  @@index([alias])
+  @@index([cvu])
   @@map("wallets")
 }
+
 
 model Transfer {
   id               String         @id @default(uuid())

@@ -19,11 +19,17 @@ export class TransfersService {
     createTransferDto: CreateTransferDto,
     idempotencyKey?: string,
   ) {
-    const { recipientEmail, recipientId, amount } = createTransferDto;
+    const {
+      recipientEmail,
+      recipientAlias,
+      recipientCvu,
+      recipientId,
+      amount,
+    } = createTransferDto;
 
-    if (!recipientEmail && !recipientId) {
+    if (!recipientEmail && !recipientAlias && !recipientCvu && !recipientId) {
       throw new BadRequestException(
-        'Debes especificar el email o ID del destinatario',
+        'Debes especificar el email, alias, CVU o ID del destinatario',
       );
     }
 
@@ -54,22 +60,45 @@ export class TransfersService {
       }
     }
 
-    // 2. Buscar y validar usuario destinatario
-    const recipientUser = await this.prisma.user.findFirst({
-      where: recipientEmail
-        ? { email: recipientEmail }
-        : { id: recipientId },
-      include: { wallet: true },
-    });
+    // 2. Buscar y validar usuario/billetera destinatario
+    let receiverWallet: any = null;
 
-    if (!recipientUser || !recipientUser.wallet) {
+    if (recipientCvu) {
+      receiverWallet = await this.prisma.wallet.findUnique({
+        where: { cvu: recipientCvu },
+        include: { user: true },
+      });
+    } else if (recipientAlias) {
+      receiverWallet = await this.prisma.wallet.findUnique({
+        where: { alias: recipientAlias },
+        include: { user: true },
+      });
+    } else if (recipientEmail) {
+      const recipientUser = await this.prisma.user.findUnique({
+        where: { email: recipientEmail },
+        include: { wallet: true },
+      });
+      if (recipientUser && recipientUser.wallet) {
+        receiverWallet = {
+          ...recipientUser.wallet,
+          user: recipientUser,
+        };
+      }
+    } else if (recipientId) {
+      receiverWallet = await this.prisma.wallet.findUnique({
+        where: { userId: recipientId },
+        include: { user: true },
+      });
+    }
+
+    if (!receiverWallet) {
       throw new NotFoundException(
         'El destinatario no existe o no tiene una billetera activa',
       );
     }
 
     // 3. Regla de negocio: El remitente no puede transferirse a sí mismo
-    if (recipientUser.id === senderUserId) {
+    if (receiverWallet.userId === senderUserId) {
       throw new BadRequestException(
         'No puedes transferirte dinero a ti mismo',
       );
@@ -90,7 +119,6 @@ export class TransfersService {
       );
     }
 
-    const receiverWallet = recipientUser.wallet;
 
     // 5. Transacción atómica: Débito, Crédito, Creación de Transferencia y Movimientos
     const transfer = await this.prisma.$transaction(async (tx) => {
