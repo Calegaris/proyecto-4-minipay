@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto, LoginDto, RefreshTokenDto } from './dto';
+import { WalletFactory } from '../wallets/factories';
 
 @Injectable()
 export class AuthService {
@@ -15,6 +16,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private walletFactory: WalletFactory,
   ) {}
 
   async register(registerDto: RegisterDto) {
@@ -33,7 +35,9 @@ export class AuthService {
     );
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
-    // Transacción atómica: Crear Usuario y su Billetera inicial
+    const initialWallet = this.walletFactory.createInitialWallet(name);
+
+    // Transacción atómica: Crear Usuario y su Billetera inicial con Alias y CVU
     const user = await this.prisma.$transaction(async (tx) => {
       const newUser = await tx.user.create({
         data: {
@@ -41,10 +45,7 @@ export class AuthService {
           email,
           passwordHash,
           wallet: {
-            create: {
-              currency: 'ARS',
-              balance: 0.0,
-            },
+            create: initialWallet,
           },
         },
         include: {
@@ -54,6 +55,7 @@ export class AuthService {
 
       return newUser;
     });
+
 
     const tokens = await this.generateAndSaveTokens(user.id, user.email);
 
