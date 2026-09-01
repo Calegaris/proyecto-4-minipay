@@ -22,7 +22,9 @@ enum TransactionType {
   DEPOSIT
   TRANSFER_SENT
   TRANSFER_RECEIVED
+  YIELD
 }
+
 
 // --------------------------------------------------------------
 // MODELOS
