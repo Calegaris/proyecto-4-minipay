@@ -148,4 +148,41 @@ describe('WalletsModule (e2e)', () => {
       ).toBeGreaterThanOrEqual(1);
     });
   });
+
+  describe('Yields Engine & Remunerated Account', () => {
+    it('debe consultar métricas y proyecciones de rendimientos (GET /wallet/yields)', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/wallet/yields')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(response.body).toHaveProperty('currentBalance', 5000);
+      expect(response.body).toHaveProperty('tna', '35.00%');
+      expect(response.body).toHaveProperty('dailyRatePercentage');
+      expect(response.body).toHaveProperty('estimatedDailyYield', 4.79);
+      expect(response.body).toHaveProperty('estimatedMonthlyYield');
+      expect(response.body).toHaveProperty('estimatedAnnualYield');
+    });
+
+    it('debe simular y acreditar 1 día de rendimiento exitosamente (POST /wallet/simulate-yield)', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/wallet/simulate-yield')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(response.body).toHaveProperty('creditedAmount', 4.79);
+      expect(response.body).toHaveProperty('newBalance', 5004.79);
+      expect(response.body.transaction).toHaveProperty('type', 'YIELD');
+      expect(response.body.transaction).toHaveProperty('amount', '4.79');
+    });
+
+    it('debe rechazar una segunda acreditación en el mismo día por idempotencia diaria (409 Conflict)', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/wallet/simulate-yield')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(409);
+
+      expect(response.body.message).toContain('ya ha sido acreditado');
+    });
+  });
 });
