@@ -12,7 +12,8 @@ import {
 export class CreateTransferDto {
   @ApiPropertyOptional({
     example: 'juan@test.com',
-    description: 'Email del destinatario (opcional si se especifica recipientAlias, recipientCvu o recipientId)',
+    description:
+      'Email del destinatario (opcional si se especifica recipientAlias, recipientCvu o recipientId)',
   })
   @IsOptional()
   @IsEmail({}, { message: 'El email del destinatario no es válido' })

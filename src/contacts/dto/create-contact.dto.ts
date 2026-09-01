@@ -14,14 +14,19 @@ export class CreateContactDto {
     description: 'Nombre personalizado visible en la agenda de contactos',
     maxLength: 50,
   })
-  @IsNotEmpty({ message: 'El nombre personalizado del contacto es obligatorio' })
+  @IsNotEmpty({
+    message: 'El nombre personalizado del contacto es obligatorio',
+  })
   @IsString({ message: 'El nombre personalizado debe ser un texto' })
-  @MaxLength(50, { message: 'El nombre personalizado no puede superar los 50 caracteres' })
+  @MaxLength(50, {
+    message: 'El nombre personalizado no puede superar los 50 caracteres',
+  })
   aliasCustomName: string;
 
   @ApiPropertyOptional({
     example: 'lucas@minipay.com',
-    description: 'Email del contacto a agendar (al menos uno entre email, alias o cvu es requerido)',
+    description:
+      'Email del contacto a agendar (al menos uno entre email, alias o cvu es requerido)',
   })
   @IsOptional()
   @IsEmail({}, { message: 'El email del contacto no es válido' })

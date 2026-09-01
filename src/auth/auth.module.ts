@@ -9,7 +9,6 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { WalletsModule } from '../wallets/wallets.module';
 
 @Module({
-
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
@@ -31,4 +30,3 @@ import { WalletsModule } from '../wallets/wallets.module';
   exports: [AuthService, JwtModule, PassportModule, JwtAuthGuard],
 })
 export class AuthModule {}
-

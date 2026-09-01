@@ -5,7 +5,6 @@ import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { cleanupTestUsers } from './test-utils';
 
-
 describe('ContactsModule (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;

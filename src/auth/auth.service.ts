@@ -56,7 +56,6 @@ export class AuthService {
       return newUser;
     });
 
-
     const tokens = await this.generateAndSaveTokens(user.id, user.email);
 
     return {
@@ -183,7 +182,6 @@ export class AuthService {
       }
     }
 
-
     return { message: 'Sesión cerrada con éxito' };
   }
 
@@ -195,7 +193,6 @@ export class AuthService {
       expiresIn: (this.configService.get<string>('JWT_EXPIRES_IN') ??
         '15m') as any,
     });
-
 
     const refreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET');
     const refreshExpiresIn =
@@ -228,7 +225,3 @@ export class AuthService {
     };
   }
 }
-
-
-
-

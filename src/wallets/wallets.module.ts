@@ -9,4 +9,3 @@ import { WalletFactory } from './factories';
   exports: [WalletsService, WalletFactory],
 })
 export class WalletsModule {}
-

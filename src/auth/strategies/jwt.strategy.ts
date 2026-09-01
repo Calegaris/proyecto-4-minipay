@@ -33,7 +33,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     }
 
     // Excluir passwordHash del objeto adjunto a request.user
-    const { passwordHash, ...userWithoutPassword } = user;
+    const { passwordHash: _passwordHash, ...userWithoutPassword } = user;
     return userWithoutPassword;
   }
 }

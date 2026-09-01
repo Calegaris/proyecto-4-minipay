@@ -10,7 +10,6 @@ import { TransferStatus, TransactionType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTransferDto, TransferQueryDto } from './dto';
 
-
 @Injectable()
 export class TransfersService {
   constructor(private prisma: PrismaService) {}
@@ -100,9 +99,7 @@ export class TransfersService {
 
     // 3. Regla de negocio: El remitente no puede transferirse a sí mismo
     if (receiverWallet.userId === senderUserId) {
-      throw new BadRequestException(
-        'No puedes transferirte dinero a ti mismo',
-      );
+      throw new BadRequestException('No puedes transferirte dinero a ti mismo');
     }
 
     // 4. Buscar billetera del remitente y verificar saldo disponible
@@ -169,7 +166,6 @@ export class TransfersService {
         },
       });
 
-
       // Crear registro principal de Transferencia
       const newTransfer = await tx.transfer.create({
         data: {
@@ -235,11 +231,13 @@ export class TransfersService {
     return transfer;
   }
 
-  async getTransfers(userId: string, query: TransferQueryDto = new TransferQueryDto()) {
+  async getTransfers(
+    userId: string,
+    query: TransferQueryDto = new TransferQueryDto(),
+  ) {
     const wallet = await this.prisma.wallet.findUnique({
       where: { userId },
     });
-
 
     if (!wallet) {
       throw new NotFoundException('Billetera no encontrada');
@@ -249,10 +247,7 @@ export class TransfersService {
     const skip = (page - 1) * limit;
 
     const where: Prisma.TransferWhereInput = {
-      OR: [
-        { senderWalletId: wallet.id },
-        { receiverWalletId: wallet.id },
-      ],
+      OR: [{ senderWalletId: wallet.id }, { receiverWalletId: wallet.id }],
       ...(status ? { status } : {}),
     };
 
@@ -295,4 +290,3 @@ export class TransfersService {
     };
   }
 }
-
