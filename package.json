@@ -20,11 +20,9 @@
     "test:e2e": "jest --config ./test/jest-e2e.json --runInBand --forceExit",
     "db:seed": "ts-node prisma/seed.ts"
   },
-
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
   },
-
   "dependencies": {
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.4",
@@ -32,6 +30,7 @@
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/schedule": "^5.0.1",
     "@nestjs/swagger": "^11.0.0",
     "@nestjs/throttler": "^6.5.0",
     "@prisma/adapter-pg": "^7.10.0",
