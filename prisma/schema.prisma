@@ -92,8 +92,11 @@ model Transaction {
   wallet     Wallet          @relation(fields: [walletId], references: [id], onDelete: Cascade)
   transfer   Transfer?       @relation(fields: [transferId], references: [id], onDelete: SetNull)
 
+  @@index([walletId, type, createdAt])
+  @@index([walletId, createdAt])
   @@map("transactions")
 }
+
 
 model RefreshToken {
   id        String    @id @default(uuid())

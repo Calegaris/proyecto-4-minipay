@@ -90,6 +90,25 @@ export class WalletsController {
   ) {
     return this.walletsService.getTransactions(userId, query);
   }
+
+  @Get('stats')
+  @ApiOperation({
+    summary: 'Consultar métricas y estadísticas financieras',
+    description:
+      'Retorna el resumen financiero mensual e histórico: total depositado, enviado, recibido, cantidad de operaciones y flujo neto de caja (Net Cash Flow).',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Estadísticas financieras calculadas exitosamente',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'No autorizado / Token ausente o inválido',
+  })
+  async getWalletStats(@CurrentUser('id') userId: string) {
+    return this.walletsService.getWalletStats(userId);
+  }
 }
+
 
 
