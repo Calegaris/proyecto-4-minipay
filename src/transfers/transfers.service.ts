@@ -8,11 +8,15 @@ import {
 } from '@nestjs/common';
 import { TransferStatus, TransactionType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { ReceiptsService } from './services/receipts.service';
 import { CreateTransferDto, TransferQueryDto } from './dto';
 
 @Injectable()
 export class TransfersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private receiptsService: ReceiptsService,
+  ) {}
 
   async createTransfer(
     senderUserId: string,
@@ -229,6 +233,37 @@ export class TransfersService {
     }
 
     return transfer;
+  }
+
+  async getTransferReceipt(userId: string, transferId: string) {
+    const transfer = await this.prisma.transfer.findUnique({
+      where: { id: transferId },
+      include: {
+        senderWallet: { include: { user: true } },
+        receiverWallet: { include: { user: true } },
+      },
+    });
+
+    if (!transfer) {
+      throw new NotFoundException('Transferencia no encontrada');
+    }
+
+    // Regla de autorización: Solo el remitente o el destinatario pueden descargar el comprobante
+    const isParticipant =
+      transfer.senderWallet.userId === userId ||
+      transfer.receiverWallet.userId === userId;
+
+    if (!isParticipant) {
+      throw new ForbiddenException(
+        'No tienes permisos para descargar el comprobante de esta transferencia',
+      );
+    }
+
+    const buffer =
+      await this.receiptsService.generateTransferReceiptPdf(transfer);
+    const filename = `comprobante-transferencia-${transfer.id}.pdf`;
+
+    return { buffer, filename };
   }
 
   async getTransfers(

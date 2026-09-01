@@ -9,7 +9,12 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Res,
+  StreamableFile,
+  ParseUUIDPipe,
 } from '@nestjs/common';
+import type { Response } from 'express';
+
 import {
   ApiBearerAuth,
   ApiHeader,
@@ -82,6 +87,62 @@ export class TransfersController {
       createTransferDto,
       idempotencyKey,
     );
+  }
+
+  @Get(':id/receipt')
+  @ApiOperation({
+    summary: 'Descargar comprobante bancario en PDF',
+    description:
+      'Genera y descarga en tiempo real el comprobante oficial de la transferencia en formato PDF. Solo accesible para el emisor o receptor.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID de la transferencia (UUID)',
+    example: 'd9b1c782-5813-435b-a63e-63f58e1c60f2',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Comprobante bancario en PDF generado y descargado exitosamente',
+    content: {
+      'application/pdf': {
+        schema: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'No autorizado / Token ausente o inválido',
+  })
+  @ApiResponse({
+    status: 403,
+    description:
+      'Acceso denegado (el usuario no participó en la transferencia)',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Transferencia no encontrada',
+  })
+  async downloadReceipt(
+    @CurrentUser('id') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const { buffer, filename } = await this.transfersService.getTransferReceipt(
+      userId,
+      id,
+    );
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': buffer.length.toString(),
+    });
+
+    return new StreamableFile(buffer);
   }
 
   @Get(':id')
