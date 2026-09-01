@@ -6,6 +6,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import { RefreshToken } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto, LoginDto, RefreshTokenDto } from './dto';
 import { WalletFactory } from '../wallets/factories';
@@ -122,7 +123,7 @@ export class AuthService {
       },
     });
 
-    let matchedTokenRecord: (typeof userTokens)[0] | null = null;
+    let matchedTokenRecord: RefreshToken | null = null;
 
     for (const record of userTokens) {
       const isMatch = await bcrypt.compare(refreshToken, record.tokenHash);

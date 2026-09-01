@@ -31,9 +31,8 @@ export class LoggingInterceptor implements NestInterceptor {
         next: () => {
           const latency = Date.now() - startTime;
           const statusCode = res.statusCode;
-          const userId = (req as any).user?.id
-            ? ` - User: ${(req as any).user.id}`
-            : '';
+          const user = (req as Request & { user?: { id?: string } }).user;
+          const userId = user?.id ? ` - User: ${user.id}` : '';
 
           this.logger.log(
             `[${correlationId}] ${method} ${originalUrl} - ${statusCode} +${latency}ms${userId}`,
