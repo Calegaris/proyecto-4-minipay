@@ -56,7 +56,8 @@ export class UsersController {
   })
   @ApiResponse({
     status: 400,
-    description: 'La nueva contraseña no cumple los requisitos o es idéntica a la anterior',
+    description:
+      'La nueva contraseña no cumple los requisitos o es idéntica a la anterior',
   })
   @ApiResponse({
     status: 401,

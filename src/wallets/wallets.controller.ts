@@ -19,7 +19,6 @@ import { DepositDto, TransactionQueryDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
-
 @ApiTags('Wallet')
 @ApiBearerAuth('JWT-auth')
 @Controller('wallet')
@@ -30,7 +29,8 @@ export class WalletsController {
   @Get()
   @ApiOperation({
     summary: 'Consultar saldo y datos de la billetera',
-    description: 'Retorna el saldo actual, moneda y datos de la billetera del usuario autenticado.',
+    description:
+      'Retorna el saldo actual, moneda y datos de la billetera del usuario autenticado.',
   })
   @ApiResponse({
     status: 200,
@@ -109,6 +109,3 @@ export class WalletsController {
     return this.walletsService.getWalletStats(userId);
   }
 }
-
-
-

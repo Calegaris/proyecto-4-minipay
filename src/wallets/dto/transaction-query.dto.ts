@@ -11,7 +11,8 @@ export class TransactionQueryDto extends PaginationQueryDto {
   })
   @IsOptional()
   @IsEnum(TransactionType, {
-    message: 'El tipo de transacción debe ser DEPOSIT, TRANSFER_SENT o TRANSFER_RECEIVED',
+    message:
+      'El tipo de transacción debe ser DEPOSIT, TRANSFER_SENT o TRANSFER_RECEIVED',
   })
   type?: TransactionType;
 }

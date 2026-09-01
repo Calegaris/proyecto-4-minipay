@@ -86,7 +86,6 @@ export class UsersService {
           revokedAt: new Date(),
         },
       });
-
     });
 
     return {

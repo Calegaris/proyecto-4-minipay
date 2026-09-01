@@ -1,10 +1,4 @@
-import {
-  Controller,
-  Post,
-  Body,
-  HttpCode,
-  HttpStatus,
-} from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
@@ -84,7 +78,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Cerrar sesión',
-    description: 'Revoca el Refresh Token en la base de datos para impedir su reutilización.',
+    description:
+      'Revoca el Refresh Token en la base de datos para impedir su reutilización.',
   })
   @ApiResponse({
     status: 200,

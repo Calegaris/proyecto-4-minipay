@@ -15,7 +15,9 @@ export class AppController {
   }
 
   @Get('health')
-  @ApiOperation({ summary: 'Health check probe para monitoreo de liveness y readiness' })
+  @ApiOperation({
+    summary: 'Health check probe para monitoreo de liveness y readiness',
+  })
   @ApiResponse({
     status: 200,
     description: 'Servicio en funcionamiento correcto',
@@ -33,5 +35,3 @@ export class AppController {
     };
   }
 }
-
-

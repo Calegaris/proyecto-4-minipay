@@ -52,7 +52,10 @@ export class WalletsService {
     return result;
   }
 
-  async getTransactions(userId: string, query: TransactionQueryDto = new TransactionQueryDto()) {
+  async getTransactions(
+    userId: string,
+    query: TransactionQueryDto = new TransactionQueryDto(),
+  ) {
     const wallet = await this.getWallet(userId);
     const { page = 1, limit = 10, type } = query;
 
@@ -173,4 +176,3 @@ export class WalletsService {
     };
   }
 }
-

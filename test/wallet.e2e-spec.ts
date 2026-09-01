@@ -51,7 +51,6 @@ describe('WalletsModule (e2e)', () => {
     await app.close();
   });
 
-
   describe('GET /wallet', () => {
     it('debe rechazar el acceso con 401 si no se envía token de autenticación', async () => {
       await request(app.getHttpServer()).get('/wallet').expect(401);
@@ -116,7 +115,6 @@ describe('WalletsModule (e2e)', () => {
   });
 
   describe('GET /wallet/stats', () => {
-
     it('debe rechazar el acceso a stats con 401 si no se envía token de autenticación', async () => {
       await request(app.getHttpServer()).get('/wallet/stats').expect(401);
     });
@@ -137,15 +135,17 @@ describe('WalletsModule (e2e)', () => {
       expect(response.body.monthlySummary.totalTransferred).toBe(0);
       expect(response.body.monthlySummary.totalReceived).toBe(0);
       expect(response.body.monthlySummary.netCashFlow).toBe(5000);
-      expect(response.body.monthlySummary.transactionCount).toBeGreaterThanOrEqual(1);
+      expect(
+        response.body.monthlySummary.transactionCount,
+      ).toBeGreaterThanOrEqual(1);
 
       // Resumen histórico (All-time)
       expect(response.body).toHaveProperty('allTimeSummary');
       expect(response.body.allTimeSummary.totalDeposited).toBe(5000);
       expect(response.body.allTimeSummary.netCashFlow).toBe(5000);
-      expect(response.body.allTimeSummary.totalOperationsCount).toBeGreaterThanOrEqual(1);
+      expect(
+        response.body.allTimeSummary.totalOperationsCount,
+      ).toBeGreaterThanOrEqual(1);
     });
   });
 });
-
-

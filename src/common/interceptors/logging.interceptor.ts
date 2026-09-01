@@ -20,7 +20,10 @@ export class LoggingInterceptor implements NestInterceptor {
     const res = ctx.getResponse<Response>();
 
     const { method, originalUrl } = req;
-    const correlationId = req.correlationId || (res.getHeader('X-Correlation-ID') as string) || 'N/A';
+    const correlationId =
+      req.correlationId ||
+      (res.getHeader('X-Correlation-ID') as string) ||
+      'N/A';
     const startTime = Date.now();
 
     return next.handle().pipe(
@@ -28,7 +31,8 @@ export class LoggingInterceptor implements NestInterceptor {
         next: () => {
           const latency = Date.now() - startTime;
           const statusCode = res.statusCode;
-          const userId = (req as any).user?.id ? ` - User: ${(req as any).user.id}` : '';
+          const user = (req as Request & { user?: { id?: string } }).user;
+          const userId = user?.id ? ` - User: ${user.id}` : '';
 
           this.logger.log(
             `[${correlationId}] ${method} ${originalUrl} - ${statusCode} +${latency}ms${userId}`,
@@ -38,8 +42,7 @@ export class LoggingInterceptor implements NestInterceptor {
           const latency = Date.now() - startTime;
           const statusCode =
             error instanceof HttpException ? error.getStatus() : 500;
-          const errorMessage =
-            error.message || 'Internal Server Error';
+          const errorMessage = error.message || 'Internal Server Error';
 
           this.logger.error(
             `[${correlationId}] ${method} ${originalUrl} - ${statusCode} +${latency}ms - Error: ${errorMessage}`,

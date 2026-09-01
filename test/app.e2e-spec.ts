@@ -31,9 +31,7 @@ describe('AppController & Observability (e2e)', () => {
 
   describe('Correlation ID Middleware & Observability', () => {
     it('debe generar y retornar automáticamente una cabecera X-Correlation-ID en respuestas 200', async () => {
-      const response = await request(app.getHttpServer())
-        .get('/')
-        .expect(200);
+      const response = await request(app.getHttpServer()).get('/').expect(200);
 
       expect(response.headers).toHaveProperty('x-correlation-id');
       expect(response.headers['x-correlation-id']).toMatch(
@@ -74,7 +72,10 @@ describe('AppController & Observability (e2e)', () => {
       expect(response.headers['x-correlation-id']).toBe(customId);
       expect(response.body).toHaveProperty('correlationId', customId);
       expect(response.body).toHaveProperty('statusCode', 404);
-      expect(response.body).toHaveProperty('path', '/non-existent-endpoint-route');
+      expect(response.body).toHaveProperty(
+        'path',
+        '/non-existent-endpoint-route',
+      );
     });
   });
 });

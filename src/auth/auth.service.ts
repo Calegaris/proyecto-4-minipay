@@ -6,6 +6,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import { RefreshToken } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto, LoginDto, RefreshTokenDto } from './dto';
 import { WalletFactory } from '../wallets/factories';
@@ -55,7 +56,6 @@ export class AuthService {
 
       return newUser;
     });
-
 
     const tokens = await this.generateAndSaveTokens(user.id, user.email);
 
@@ -123,7 +123,7 @@ export class AuthService {
       },
     });
 
-    let matchedTokenRecord: (typeof userTokens)[0] | null = null;
+    let matchedTokenRecord: RefreshToken | null = null;
 
     for (const record of userTokens) {
       const isMatch = await bcrypt.compare(refreshToken, record.tokenHash);
@@ -183,7 +183,6 @@ export class AuthService {
       }
     }
 
-
     return { message: 'Sesión cerrada con éxito' };
   }
 
@@ -195,7 +194,6 @@ export class AuthService {
       expiresIn: (this.configService.get<string>('JWT_EXPIRES_IN') ??
         '15m') as any,
     });
-
 
     const refreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET');
     const refreshExpiresIn =
@@ -228,7 +226,3 @@ export class AuthService {
     };
   }
 }
-
-
-
-

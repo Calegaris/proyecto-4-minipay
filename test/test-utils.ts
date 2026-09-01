@@ -9,9 +9,7 @@ export async function cleanupTestUsers(
     include: { wallet: true },
   });
 
-  const walletIds = users
-    .map((u) => u.wallet?.id)
-    .filter(Boolean) as string[];
+  const walletIds = users.map((u) => u.wallet?.id).filter(Boolean) as string[];
 
   if (walletIds.length > 0) {
     await prisma.transfer.deleteMany({

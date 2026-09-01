@@ -23,7 +23,6 @@ import { CreateTransferDto, TransferQueryDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
-
 @ApiTags('Transfers')
 @ApiBearerAuth('JWT-auth')
 @Controller('transfers')
@@ -74,7 +73,6 @@ export class TransfersController {
     description: 'Límite operativo diario de transferencias excedido',
   })
   async createTransfer(
-
     @CurrentUser('id') userId: string,
     @Body() createTransferDto: CreateTransferDto,
     @Headers('idempotency-key') idempotencyKey?: string,
@@ -107,7 +105,8 @@ export class TransfersController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Acceso denegado (el usuario no participó en la transferencia)',
+    description:
+      'Acceso denegado (el usuario no participó en la transferencia)',
   })
   @ApiResponse({
     status: 404,
@@ -141,5 +140,3 @@ export class TransfersController {
     return this.transfersService.getTransfers(userId, query);
   }
 }
-
-

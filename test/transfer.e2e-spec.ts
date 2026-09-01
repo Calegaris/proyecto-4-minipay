@@ -33,7 +33,6 @@ describe('TransfersModule (e2e)', () => {
   let receiverWallet: any;
   const idempotencyKey = 'transfer-key-test-12345';
 
-
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -82,7 +81,6 @@ describe('TransfersModule (e2e)', () => {
     thirdPartyToken = thirdPartyReg.body.tokens.accessToken;
   });
 
-
   afterAll(async () => {
     // Limpieza posterior
     await cleanupTestUsers(prisma, [
@@ -92,7 +90,6 @@ describe('TransfersModule (e2e)', () => {
     ]);
     await app.close();
   });
-
 
   describe('POST /transfers (Transferencias & Reglas de Negocio)', () => {
     it('debe ejecutar una transferencia válida atómicamente y actualizar ambos saldos', async () => {
@@ -251,7 +248,6 @@ describe('TransfersModule (e2e)', () => {
     });
   });
 
-
   describe('GET /transfers/:id (Autorización)', () => {
     it('el remitente debe poder consultar el detalle de su transferencia', async () => {
       const response = await request(app.getHttpServer())
@@ -281,12 +277,12 @@ describe('TransfersModule (e2e)', () => {
       expect(response.body).toHaveProperty('meta');
       expect(Array.isArray(response.body.data)).toBe(true);
       expect(response.body.data.length).toBeGreaterThanOrEqual(1);
-      expect(response.body.data.some((t: any) => t.id === createdTransferId)).toBe(true);
+      expect(
+        response.body.data.some((t: any) => t.id === createdTransferId),
+      ).toBe(true);
       expect(response.body.meta).toHaveProperty('total');
       expect(response.body.meta.page).toBe(1);
       expect(response.body.meta.limit).toBe(5);
     });
   });
-
-
 });
