@@ -28,6 +28,7 @@ describe('TransfersModule (e2e)', () => {
   };
 
   let senderToken: string;
+  let receiverToken: string;
   let thirdPartyToken: string;
   let createdTransferId: string;
   let receiverWallet: any;
@@ -73,11 +74,13 @@ describe('TransfersModule (e2e)', () => {
       .post('/auth/register')
       .send(receiverUser);
     receiverWallet = receiverReg.body.user.wallet;
+    receiverToken = receiverReg.body.tokens.accessToken;
 
     // 3. Registrar Third Party User
     const thirdPartyReg = await request(app.getHttpServer())
       .post('/auth/register')
       .send(thirdPartyUser);
+
     thirdPartyToken = thirdPartyReg.body.tokens.accessToken;
   });
 
@@ -283,6 +286,48 @@ describe('TransfersModule (e2e)', () => {
       expect(response.body.meta).toHaveProperty('total');
       expect(response.body.meta.page).toBe(1);
       expect(response.body.meta.limit).toBe(5);
+    });
+  });
+
+  describe('GET /transfers/:id/receipt (Comprobantes en PDF)', () => {
+    it('el remitente debe poder descargar el comprobante bancario en PDF', async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/transfers/${createdTransferId}/receipt`)
+        .set('Authorization', `Bearer ${senderToken}`)
+        .expect(200);
+
+      expect(response.headers['content-type']).toContain('application/pdf');
+      expect(response.headers['content-disposition']).toContain('attachment');
+      expect(response.headers['content-disposition']).toContain(
+        `comprobante-transferencia-${createdTransferId}.pdf`,
+      );
+      expect(Buffer.isBuffer(response.body) || response.body.length > 0).toBe(
+        true,
+      );
+    });
+
+    it('el destinatario debe poder descargar el mismo comprobante en PDF', async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/transfers/${createdTransferId}/receipt`)
+        .set('Authorization', `Bearer ${receiverToken}`)
+        .expect(200);
+
+      expect(response.headers['content-type']).toContain('application/pdf');
+      expect(response.headers['content-disposition']).toContain('attachment');
+    });
+
+    it('un usuario tercero debe recibir 403 Forbidden al intentar descargar el comprobante', async () => {
+      await request(app.getHttpServer())
+        .get(`/transfers/${createdTransferId}/receipt`)
+        .set('Authorization', `Bearer ${thirdPartyToken}`)
+        .expect(403);
+    });
+
+    it('debe retornar 404 Not Found si la transferencia no existe', async () => {
+      await request(app.getHttpServer())
+        .get('/transfers/00000000-0000-0000-0000-000000000000/receipt')
+        .set('Authorization', `Bearer ${senderToken}`)
+        .expect(404);
     });
   });
 });
