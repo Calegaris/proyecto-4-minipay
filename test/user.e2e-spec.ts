@@ -131,4 +131,75 @@ describe('UsersModule (e2e)', () => {
       expect(loginRes.body).toHaveProperty('tokens');
     });
   });
+
+  describe('PATCH /users/me/avatar (Foto de Perfil)', () => {
+    const validAvatarUrl =
+      'https://res.cloudinary.com/minipay/image/upload/v12345/avatar.png';
+
+    it('debe actualizar la foto de perfil exitosamente con una URL HTTPS válida (200 OK)', async () => {
+      const response = await request(app.getHttpServer())
+        .patch('/users/me/avatar')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ avatarUrl: validAvatarUrl })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('id');
+      expect(response.body).toHaveProperty('email', testUser.email);
+      expect(response.body).toHaveProperty('avatarUrl', validAvatarUrl);
+      expect(response.body).not.toHaveProperty('passwordHash');
+    });
+
+    it('debe reflejar la nueva foto de perfil al consultar GET /users/me', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/users/me')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(response.body).toHaveProperty('avatarUrl', validAvatarUrl);
+    });
+
+    it('debe permitir eliminar/resetear la foto de perfil enviando avatarUrl: null', async () => {
+      const response = await request(app.getHttpServer())
+        .patch('/users/me/avatar')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ avatarUrl: null })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('avatarUrl', null);
+
+      const profileRes = await request(app.getHttpServer())
+        .get('/users/me')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(profileRes.body.avatarUrl).toBeNull();
+    });
+
+    it('debe rechazar URLs con protocolo no seguro HTTP (400 Bad Request)', async () => {
+      const response = await request(app.getHttpServer())
+        .patch('/users/me/avatar')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ avatarUrl: 'http://inseguro.com/foto.png' })
+        .expect(400);
+
+      expect(response.body.message).toEqual(
+        expect.arrayContaining([expect.stringContaining('HTTPS')]),
+      );
+    });
+
+    it('debe rechazar formatos de URL inválidos (400 Bad Request)', async () => {
+      await request(app.getHttpServer())
+        .patch('/users/me/avatar')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ avatarUrl: 'not-a-valid-url' })
+        .expect(400);
+    });
+
+    it('debe rechazar peticiones no autenticadas con 401 Unauthorized', async () => {
+      await request(app.getHttpServer())
+        .patch('/users/me/avatar')
+        .send({ avatarUrl: validAvatarUrl })
+        .expect(401);
+    });
+  });
 });
