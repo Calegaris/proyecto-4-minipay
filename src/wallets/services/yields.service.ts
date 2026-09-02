@@ -7,7 +7,8 @@ import {
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
-import { Prisma, TransactionType } from '@prisma/client';
+import { Prisma, TransactionCategory, TransactionType } from '@prisma/client';
+
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -174,6 +175,7 @@ export class YieldsService {
         data: {
           walletId: wallet.id,
           type: TransactionType.YIELD,
+          category: TransactionCategory.YIELD,
           amount: yieldAmount,
         },
       });
@@ -237,6 +239,7 @@ export class YieldsService {
             data: {
               walletId: wallet.id,
               type: TransactionType.YIELD,
+              category: TransactionCategory.YIELD,
               amount: yieldAmount,
             },
           });

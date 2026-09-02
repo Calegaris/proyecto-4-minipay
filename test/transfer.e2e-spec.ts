@@ -111,6 +111,7 @@ describe('TransfersModule (e2e)', () => {
       expect(response.body).toHaveProperty('id');
       expect(response.body.amount).toBe('2500');
       expect(response.body.status).toBe('COMPLETED');
+      expect(response.body.category).toBe('GENERAL_TRANSFER');
       expect(response.body.idempotencyKey).toBe(idempotencyKey);
 
       createdTransferId = response.body.id;
@@ -155,6 +156,21 @@ describe('TransfersModule (e2e)', () => {
         })
         .expect(400);
     });
+
+    it('debe permitir asignar una categoría de gasto explícita a la transferencia (ej. SERVICES)', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/transfers')
+        .set('Authorization', `Bearer ${senderToken}`)
+        .send({
+          recipientEmail: receiverUser.email,
+          amount: 500,
+          category: 'SERVICES',
+        })
+        .expect(200);
+
+      expect(response.body.category).toBe('SERVICES');
+    });
+
 
     it('debe rechazar transferencias con saldo insuficiente con 409 Conflict', async () => {
       await request(app.getHttpServer())

@@ -1,6 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { TransactionCategory } from '@prisma/client';
 import {
   IsEmail,
+  IsEnum,
   IsNumber,
   IsOptional,
   IsPositive,
@@ -56,4 +58,17 @@ export class CreateTransferDto {
   @IsPositive({ message: 'El monto a transferir debe ser mayor a 0' })
   @Min(1, { message: 'El monto mínimo de transferencia es 1' })
   amount: number;
+
+  @ApiPropertyOptional({
+    enum: TransactionCategory,
+    default: TransactionCategory.GENERAL_TRANSFER,
+    example: TransactionCategory.FOOD,
+    description: 'Categoría o rubro del gasto asociado a la transferencia',
+  })
+  @IsOptional()
+  @IsEnum(TransactionCategory, {
+    message:
+      'La categoría debe ser una de las siguientes: SERVICES, FOOD, HOUSING, ENTERTAINMENT, GENERAL_TRANSFER, YIELD, OTHER',
+  })
+  category?: TransactionCategory;
 }

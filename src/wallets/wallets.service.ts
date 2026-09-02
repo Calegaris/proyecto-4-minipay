@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { TransactionType, Prisma } from '@prisma/client';
+import { TransactionCategory, TransactionType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { DepositDto, TransactionQueryDto } from './dto';
 
@@ -39,6 +39,7 @@ export class WalletsService {
         data: {
           walletId: wallet.id,
           type: TransactionType.DEPOSIT,
+          category: TransactionCategory.OTHER,
           amount,
         },
       });
@@ -57,13 +58,14 @@ export class WalletsService {
     query: TransactionQueryDto = new TransactionQueryDto(),
   ) {
     const wallet = await this.getWallet(userId);
-    const { page = 1, limit = 10, type } = query;
+    const { page = 1, limit = 10, type, category } = query;
 
     const skip = (page - 1) * limit;
 
     const where: Prisma.TransactionWhereInput = {
       walletId: wallet.id,
       ...(type ? { type } : {}),
+      ...(category ? { category } : {}),
     };
 
     const [transactions, total] = await this.prisma.$transaction([
@@ -104,26 +106,36 @@ export class WalletsService {
     );
     const monthString = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
 
-    // Ejecutar en paralelo solo 2 consultas agregadas sobre el Ledger
-    const [monthlyGroups, allTimeGroups] = await Promise.all([
-      this.prisma.transaction.groupBy({
-        by: ['type'],
-        where: {
-          walletId: wallet.id,
-          createdAt: { gte: startOfMonth },
-        },
-        _sum: { amount: true },
-        _count: { id: true },
-      }),
-      this.prisma.transaction.groupBy({
-        by: ['type'],
-        where: {
-          walletId: wallet.id,
-        },
-        _sum: { amount: true },
-        _count: { id: true },
-      }),
-    ]);
+    // Ejecutar en paralelo 3 consultas agregadas sobre el Ledger
+    const [monthlyGroups, allTimeGroups, monthlyCategoryGroups] =
+      await Promise.all([
+        this.prisma.transaction.groupBy({
+          by: ['type'],
+          where: {
+            walletId: wallet.id,
+            createdAt: { gte: startOfMonth },
+          },
+          _sum: { amount: true },
+          _count: { id: true },
+        }),
+        this.prisma.transaction.groupBy({
+          by: ['type'],
+          where: {
+            walletId: wallet.id,
+          },
+          _sum: { amount: true },
+          _count: { id: true },
+        }),
+        this.prisma.transaction.groupBy({
+          by: ['category'],
+          where: {
+            walletId: wallet.id,
+            type: TransactionType.TRANSFER_SENT,
+            createdAt: { gte: startOfMonth },
+          },
+          _sum: { amount: true },
+        }),
+      ]);
 
     const extractStats = (groups: typeof monthlyGroups) => {
       let deposited = new Prisma.Decimal(0);
@@ -159,12 +171,32 @@ export class WalletsService {
     const monthlyStats = extractStats(monthlyGroups);
     const allTimeStats = extractStats(allTimeGroups);
 
+    // Calcular desglose de egresos por categoría con protección de división por cero
+    const totalTransferredAmount = monthlyStats.totalTransferred;
+    const spendingByCategory = monthlyCategoryGroups.map((group) => {
+      const catTotalDecimal = group._sum.amount ?? new Prisma.Decimal(0);
+      const catTotal = Number(catTotalDecimal.toFixed(2));
+      let percentage = 0;
+      if (totalTransferredAmount > 0) {
+        percentage = Number(
+          ((catTotal / totalTransferredAmount) * 100).toFixed(2),
+        );
+      }
+      return {
+        category: group.category,
+        total: catTotal,
+        percentage,
+        percentageFormatted: `${percentage.toFixed(2)}%`,
+      };
+    });
+
     return {
       currentBalance: Number(wallet.balance),
       currency: wallet.currency,
       monthlySummary: {
         month: monthString,
         ...monthlyStats,
+        spendingByCategory,
       },
       allTimeSummary: {
         totalDeposited: allTimeStats.totalDeposited,

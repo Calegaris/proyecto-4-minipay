@@ -25,6 +25,15 @@ enum TransactionType {
   YIELD
 }
 
+enum TransactionCategory {
+  SERVICES
+  FOOD
+  HOUSING
+  ENTERTAINMENT
+  GENERAL_TRANSFER
+  YIELD
+  OTHER
+}
 
 // --------------------------------------------------------------
 // MODELOS
@@ -71,35 +80,39 @@ model Wallet {
 
 
 model Transfer {
-  id               String         @id @default(uuid())
+  id               String              @id @default(uuid())
   senderWalletId   String
   receiverWalletId String
-  amount           Decimal        @db.Decimal(12, 2)
-  status           TransferStatus @default(PENDING)
-  idempotencyKey   String?        @unique
-  createdAt        DateTime       @default(now())
+  amount           Decimal             @db.Decimal(12, 2)
+  status           TransferStatus      @default(PENDING)
+  category         TransactionCategory @default(GENERAL_TRANSFER)
+  idempotencyKey   String?             @unique
+  createdAt        DateTime            @default(now())
   completedAt      DateTime?
-  senderWallet     Wallet         @relation("SentTransfers", fields: [senderWalletId], references: [id])
-  receiverWallet   Wallet         @relation("ReceivedTransfers", fields: [receiverWalletId], references: [id])
+  senderWallet     Wallet              @relation("SentTransfers", fields: [senderWalletId], references: [id])
+  receiverWallet   Wallet              @relation("ReceivedTransfers", fields: [receiverWalletId], references: [id])
   transactions     Transaction[]
 
   @@map("transfers")
 }
 
 model Transaction {
-  id         String          @id @default(uuid())
+  id         String              @id @default(uuid())
   walletId   String
   transferId String?
   type       TransactionType
-  amount     Decimal         @db.Decimal(12, 2)
-  createdAt  DateTime        @default(now())
-  wallet     Wallet          @relation(fields: [walletId], references: [id], onDelete: Cascade)
-  transfer   Transfer?       @relation(fields: [transferId], references: [id], onDelete: SetNull)
+  category   TransactionCategory @default(GENERAL_TRANSFER)
+  amount     Decimal             @db.Decimal(12, 2)
+  createdAt  DateTime            @default(now())
+  wallet     Wallet              @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  transfer   Transfer?           @relation(fields: [transferId], references: [id], onDelete: SetNull)
 
   @@index([walletId, type, createdAt])
+  @@index([walletId, category, createdAt])
   @@index([walletId, createdAt])
   @@map("transactions")
 }
+
 
 
 model RefreshToken {

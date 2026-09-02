@@ -112,6 +112,16 @@ describe('WalletsModule (e2e)', () => {
       expect(response.body.meta.page).toBe(1);
       expect(response.body.meta.limit).toBe(5);
     });
+
+    it('debe filtrar transacciones por categoría (GET /wallet/transactions?category=OTHER)', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/wallet/transactions?category=OTHER')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(response.body.data.length).toBeGreaterThanOrEqual(1);
+      expect(response.body.data[0].category).toBe('OTHER');
+    });
   });
 
   describe('GET /wallet/stats', () => {
@@ -119,7 +129,7 @@ describe('WalletsModule (e2e)', () => {
       await request(app.getHttpServer()).get('/wallet/stats').expect(401);
     });
 
-    it('debe obtener las estadísticas financieras y calcular correctamente el flujo neto de caja', async () => {
+    it('debe obtener las estadísticas financieras, calcular flujo neto y desglose de gastos por categoría', async () => {
       const response = await request(app.getHttpServer())
         .get('/wallet/stats')
         .set('Authorization', `Bearer ${accessToken}`)
@@ -138,6 +148,13 @@ describe('WalletsModule (e2e)', () => {
       expect(
         response.body.monthlySummary.transactionCount,
       ).toBeGreaterThanOrEqual(1);
+
+      // Desglose analítico de gastos por categoría (debe ser un array vacío si totalTransferred es 0)
+      expect(response.body.monthlySummary).toHaveProperty('spendingByCategory');
+      expect(
+        Array.isArray(response.body.monthlySummary.spendingByCategory),
+      ).toBe(true);
+      expect(response.body.monthlySummary.spendingByCategory).toHaveLength(0);
 
       // Resumen histórico (All-time)
       expect(response.body).toHaveProperty('allTimeSummary');

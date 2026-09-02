@@ -6,7 +6,13 @@ import {
   ForbiddenException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { TransferStatus, TransactionType, Prisma } from '@prisma/client';
+import {
+  TransferStatus,
+  TransactionType,
+  TransactionCategory,
+  Prisma,
+} from '@prisma/client';
+
 import { PrismaService } from '../prisma/prisma.service';
 import { ReceiptsService } from './services/receipts.service';
 import { CreateTransferDto, TransferQueryDto } from './dto';
@@ -29,6 +35,7 @@ export class TransfersService {
       recipientCvu,
       recipientId,
       amount,
+      category = TransactionCategory.GENERAL_TRANSFER,
     } = createTransferDto;
 
     if (!recipientEmail && !recipientAlias && !recipientCvu && !recipientId) {
@@ -176,6 +183,7 @@ export class TransfersService {
           senderWalletId: senderWallet.id,
           receiverWalletId: receiverWallet.id,
           amount,
+          category,
           status: TransferStatus.COMPLETED,
           idempotencyKey: idempotencyKey ?? null,
           completedAt: new Date(),
@@ -188,6 +196,7 @@ export class TransfersService {
           walletId: senderWallet.id,
           transferId: newTransfer.id,
           type: TransactionType.TRANSFER_SENT,
+          category,
           amount,
         },
       });
@@ -198,6 +207,7 @@ export class TransfersService {
           walletId: receiverWallet.id,
           transferId: newTransfer.id,
           type: TransactionType.TRANSFER_RECEIVED,
+          category,
           amount,
         },
       });
