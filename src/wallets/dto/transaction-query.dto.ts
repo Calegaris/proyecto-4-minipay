@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional } from 'class-validator';
-import { TransactionType } from '@prisma/client';
+import { TransactionCategory, TransactionType } from '@prisma/client';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
 export class TransactionQueryDto extends PaginationQueryDto {
@@ -12,7 +12,19 @@ export class TransactionQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsEnum(TransactionType, {
     message:
-      'El tipo de transacción debe ser DEPOSIT, TRANSFER_SENT o TRANSFER_RECEIVED',
+      'El tipo de transacción debe ser DEPOSIT, TRANSFER_SENT, TRANSFER_RECEIVED o YIELD',
   })
   type?: TransactionType;
+
+  @ApiPropertyOptional({
+    description: 'Filtrar por categoría o rubro de transacción',
+    enum: TransactionCategory,
+    example: TransactionCategory.FOOD,
+  })
+  @IsOptional()
+  @IsEnum(TransactionCategory, {
+    message:
+      'La categoría debe ser una de las siguientes: SERVICES, FOOD, HOUSING, ENTERTAINMENT, GENERAL_TRANSFER, YIELD, OTHER',
+  })
+  category?: TransactionCategory;
 }
