@@ -47,7 +47,7 @@ async function bootstrap() {
     .setDescription(
       'API RESTful de billetera digital con soporte de transferencias atómicas, autenticación JWT con rotación de refresh tokens e idempotencia.',
     )
-    .setVersion('1.0')
+    .setVersion('2.0.0')
     .addBearerAuth(
       {
         type: 'http',
