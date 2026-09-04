@@ -24,7 +24,14 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { TransfersService } from './transfers.service';
-import { CreateTransferDto, TransferQueryDto } from './dto';
+import { QrPaymentsService } from './services/qr-payments.service';
+import {
+  CreateTransferDto,
+  TransferQueryDto,
+  GenerateQrDto,
+  DecodeQrDto,
+  PayQrDto,
+} from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -33,7 +40,86 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 @Controller('transfers')
 @UseGuards(JwtAuthGuard)
 export class TransfersController {
-  constructor(private readonly transfersService: TransfersService) {}
+  constructor(
+    private readonly transfersService: TransfersService,
+    private readonly qrPaymentsService: QrPaymentsService,
+  ) {}
+
+  @Post('qr/generate')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Generar orden de cobro con Código QR Dinámico',
+    description:
+      'Crea un payload QR firmado criptográficamente con HMAC-SHA256, monto, concepto y tiempo de expiración (TTL).',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Código QR generado exitosamente',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Parámetros de cobro inválidos',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'No autorizado',
+  })
+  async generateQr(
+    @CurrentUser('id') userId: string,
+    @Body() generateQrDto: GenerateQrDto,
+  ) {
+    return this.qrPaymentsService.generateQr(userId, generateQrDto);
+  }
+
+  @Post('qr/decode')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Decodificar y previsualizar un Código QR escaneado',
+    description:
+      'Valida la firma criptográfica HMAC y vigencia temporal (TTL) del código QR antes de confirmar el pago.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Código QR decodificado y verificado exitosamente',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Código QR inválido, alterado o corrupto',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'No autorizado',
+  })
+  async decodeQr(@Body() decodeQrDto: DecodeQrDto) {
+    return this.qrPaymentsService.decodeQr(decodeQrDto.qrCode);
+  }
+
+  @Post('qr/pay')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Pagar orden mediante Código QR Dinámico',
+    description:
+      'Verifica la firma, vigencia temporal, bloquea auto-pago y ejecuta la transferencia atómicamente con protección contra Replay Attacks.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Pago de código QR procesado exitosamente',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Código QR inválido, expirado o intento de auto-pago',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'No autorizado',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Saldo insuficiente o código QR ya cobrado (Replay Attack)',
+  })
+  async payQr(@CurrentUser('id') userId: string, @Body() payQrDto: PayQrDto) {
+    return this.transfersService.payQr(userId, payQrDto);
+  }
 
   @Post()
   @HttpCode(HttpStatus.OK)

@@ -15,13 +15,15 @@ import {
 
 import { PrismaService } from '../prisma/prisma.service';
 import { ReceiptsService } from './services/receipts.service';
-import { CreateTransferDto, TransferQueryDto } from './dto';
+import { QrPaymentsService } from './services/qr-payments.service';
+import { CreateTransferDto, TransferQueryDto, PayQrDto } from './dto';
 
 @Injectable()
 export class TransfersService {
   constructor(
     private prisma: PrismaService,
     private receiptsService: ReceiptsService,
+    private qrPaymentsService: QrPaymentsService,
   ) {}
 
   async createTransfer(
@@ -333,5 +335,44 @@ export class TransfersService {
         hasPreviousPage: page > 1,
       },
     };
+  }
+
+  async payQr(payerUserId: string, payQrDto: PayQrDto) {
+    const qrData = await this.qrPaymentsService.decodeQr(payQrDto.qrCode);
+
+    if (qrData.expired) {
+      throw new BadRequestException('El código QR ha expirado');
+    }
+
+    if (qrData.alreadyPaid) {
+      throw new ConflictException('Este código QR ya fue cobrado');
+    }
+
+    // Prevenir auto-pago
+    const payerWallet = await this.prisma.wallet.findUnique({
+      where: { userId: payerUserId },
+    });
+
+    if (!payerWallet) {
+      throw new NotFoundException('Billetera del pagador no encontrada');
+    }
+
+    if (payerWallet.cvu === qrData.recipient.cvu) {
+      throw new BadRequestException(
+        'No puedes realizar un pago a tu propio código QR',
+      );
+    }
+
+    const idempotencyKey = `qr-${qrData.qrId}`;
+
+    return this.createTransfer(
+      payerUserId,
+      {
+        recipientCvu: qrData.recipient.cvu,
+        amount: qrData.amount,
+        category: qrData.category,
+      },
+      idempotencyKey,
+    );
   }
 }
