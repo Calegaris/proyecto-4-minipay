@@ -46,7 +46,6 @@ describe('AuthModule (e2e)', () => {
     await app.close();
   });
 
-
   describe('POST /auth/register', () => {
     it('debe registrar un nuevo usuario con su billetera y retornar tokens', async () => {
       const response = await request(app.getHttpServer())

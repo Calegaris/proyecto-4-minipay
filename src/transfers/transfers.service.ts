@@ -4,26 +4,45 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
-import { TransferStatus, TransactionType, Prisma } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import { CreateTransferDto, TransferQueryDto } from './dto';
+import {
+  TransferStatus,
+  TransactionType,
+  TransactionCategory,
+  Prisma,
+} from '@prisma/client';
 
+import { PrismaService } from '../prisma/prisma.service';
+import { ReceiptsService } from './services/receipts.service';
+import { QrPaymentsService } from './services/qr-payments.service';
+import { CreateTransferDto, TransferQueryDto, PayQrDto } from './dto';
 
 @Injectable()
 export class TransfersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private receiptsService: ReceiptsService,
+    private qrPaymentsService: QrPaymentsService,
+  ) {}
 
   async createTransfer(
     senderUserId: string,
     createTransferDto: CreateTransferDto,
     idempotencyKey?: string,
   ) {
-    const { recipientEmail, recipientId, amount } = createTransferDto;
+    const {
+      recipientEmail,
+      recipientAlias,
+      recipientCvu,
+      recipientId,
+      amount,
+      category = TransactionCategory.GENERAL_TRANSFER,
+    } = createTransferDto;
 
-    if (!recipientEmail && !recipientId) {
+    if (!recipientEmail && !recipientAlias && !recipientCvu && !recipientId) {
       throw new BadRequestException(
-        'Debes especificar el email o ID del destinatario',
+        'Debes especificar el email, alias, CVU o ID del destinatario',
       );
     }
 
@@ -54,28 +73,49 @@ export class TransfersService {
       }
     }
 
-    // 2. Buscar y validar usuario destinatario
-    const recipientUser = await this.prisma.user.findFirst({
-      where: recipientEmail
-        ? { email: recipientEmail }
-        : { id: recipientId },
-      include: { wallet: true },
-    });
+    // 2. Buscar y validar usuario/billetera destinatario
+    let receiverWallet: any = null;
 
-    if (!recipientUser || !recipientUser.wallet) {
+    if (recipientCvu) {
+      receiverWallet = await this.prisma.wallet.findUnique({
+        where: { cvu: recipientCvu },
+        include: { user: true },
+      });
+    } else if (recipientAlias) {
+      receiverWallet = await this.prisma.wallet.findUnique({
+        where: { alias: recipientAlias },
+        include: { user: true },
+      });
+    } else if (recipientEmail) {
+      const recipientUser = await this.prisma.user.findUnique({
+        where: { email: recipientEmail },
+        include: { wallet: true },
+      });
+      if (recipientUser && recipientUser.wallet) {
+        receiverWallet = {
+          ...recipientUser.wallet,
+          user: recipientUser,
+        };
+      }
+    } else if (recipientId) {
+      receiverWallet = await this.prisma.wallet.findUnique({
+        where: { userId: recipientId },
+        include: { user: true },
+      });
+    }
+
+    if (!receiverWallet) {
       throw new NotFoundException(
         'El destinatario no existe o no tiene una billetera activa',
       );
     }
 
     // 3. Regla de negocio: El remitente no puede transferirse a sí mismo
-    if (recipientUser.id === senderUserId) {
-      throw new BadRequestException(
-        'No puedes transferirte dinero a ti mismo',
-      );
+    if (receiverWallet.userId === senderUserId) {
+      throw new BadRequestException('No puedes transferirte dinero a ti mismo');
     }
 
-    // 4. Buscar billetera del remitente y verificar saldo
+    // 4. Buscar billetera del remitente y verificar saldo disponible
     const senderWallet = await this.prisma.wallet.findUnique({
       where: { userId: senderUserId },
     });
@@ -90,11 +130,36 @@ export class TransfersService {
       );
     }
 
-    const receiverWallet = recipientUser.wallet;
-
-    // 5. Transacción atómica: Débito, Crédito, Creación de Transferencia y Movimientos
+    // 5. Transacción atómica: Control de Riesgo Diario, Débito, Crédito, Creación de Transferencia y Movimientos
     const transfer = await this.prisma.$transaction(async (tx) => {
-      // Descontar saldo del remitente
+      // 5.1. Control de Riesgo: Calcular acumulación diaria de transferencias en UTC
+      const startOfDay = new Date();
+      startOfDay.setUTCHours(0, 0, 0, 0);
+
+      const dailyAggregate = await tx.transfer.aggregate({
+        where: {
+          senderWalletId: senderWallet.id,
+          status: TransferStatus.COMPLETED,
+          createdAt: { gte: startOfDay },
+        },
+        _sum: { amount: true },
+      });
+
+      const totalSentToday =
+        dailyAggregate._sum.amount ?? new Prisma.Decimal(0);
+      const amountDecimal = new Prisma.Decimal(amount);
+      const remainingLimit = Prisma.Decimal.sub(
+        senderWallet.dailyTransferLimit,
+        totalSentToday,
+      );
+
+      if (amountDecimal.greaterThan(remainingLimit)) {
+        throw new UnprocessableEntityException(
+          `Límite operativo diario excedido. Cupo disponible restante: $${remainingLimit.toFixed(2)} ARS`,
+        );
+      }
+
+      // 5.2. Descontar saldo del remitente
       await tx.wallet.update({
         where: { id: senderWallet.id },
         data: {
@@ -104,7 +169,7 @@ export class TransfersService {
         },
       });
 
-      // Acreditar saldo al destinatario
+      // 5.3. Acreditar saldo al destinatario
       await tx.wallet.update({
         where: { id: receiverWallet.id },
         data: {
@@ -120,6 +185,7 @@ export class TransfersService {
           senderWalletId: senderWallet.id,
           receiverWalletId: receiverWallet.id,
           amount,
+          category,
           status: TransferStatus.COMPLETED,
           idempotencyKey: idempotencyKey ?? null,
           completedAt: new Date(),
@@ -132,6 +198,7 @@ export class TransfersService {
           walletId: senderWallet.id,
           transferId: newTransfer.id,
           type: TransactionType.TRANSFER_SENT,
+          category,
           amount,
         },
       });
@@ -142,6 +209,7 @@ export class TransfersService {
           walletId: receiverWallet.id,
           transferId: newTransfer.id,
           type: TransactionType.TRANSFER_RECEIVED,
+          category,
           amount,
         },
       });
@@ -179,11 +247,44 @@ export class TransfersService {
     return transfer;
   }
 
-  async getTransfers(userId: string, query: TransferQueryDto = new TransferQueryDto()) {
+  async getTransferReceipt(userId: string, transferId: string) {
+    const transfer = await this.prisma.transfer.findUnique({
+      where: { id: transferId },
+      include: {
+        senderWallet: { include: { user: true } },
+        receiverWallet: { include: { user: true } },
+      },
+    });
+
+    if (!transfer) {
+      throw new NotFoundException('Transferencia no encontrada');
+    }
+
+    // Regla de autorización: Solo el remitente o el destinatario pueden descargar el comprobante
+    const isParticipant =
+      transfer.senderWallet.userId === userId ||
+      transfer.receiverWallet.userId === userId;
+
+    if (!isParticipant) {
+      throw new ForbiddenException(
+        'No tienes permisos para descargar el comprobante de esta transferencia',
+      );
+    }
+
+    const buffer =
+      await this.receiptsService.generateTransferReceiptPdf(transfer);
+    const filename = `comprobante-transferencia-${transfer.id}.pdf`;
+
+    return { buffer, filename };
+  }
+
+  async getTransfers(
+    userId: string,
+    query: TransferQueryDto = new TransferQueryDto(),
+  ) {
     const wallet = await this.prisma.wallet.findUnique({
       where: { userId },
     });
-
 
     if (!wallet) {
       throw new NotFoundException('Billetera no encontrada');
@@ -193,10 +294,7 @@ export class TransfersService {
     const skip = (page - 1) * limit;
 
     const where: Prisma.TransferWhereInput = {
-      OR: [
-        { senderWalletId: wallet.id },
-        { receiverWalletId: wallet.id },
-      ],
+      OR: [{ senderWalletId: wallet.id }, { receiverWalletId: wallet.id }],
       ...(status ? { status } : {}),
     };
 
@@ -238,5 +336,43 @@ export class TransfersService {
       },
     };
   }
-}
 
+  async payQr(payerUserId: string, payQrDto: PayQrDto) {
+    const qrData = await this.qrPaymentsService.decodeQr(payQrDto.qrCode);
+
+    if (qrData.expired) {
+      throw new BadRequestException('El código QR ha expirado');
+    }
+
+    if (qrData.alreadyPaid) {
+      throw new ConflictException('Este código QR ya fue cobrado');
+    }
+
+    // Prevenir auto-pago
+    const payerWallet = await this.prisma.wallet.findUnique({
+      where: { userId: payerUserId },
+    });
+
+    if (!payerWallet) {
+      throw new NotFoundException('Billetera del pagador no encontrada');
+    }
+
+    if (payerWallet.cvu === qrData.recipient.cvu) {
+      throw new BadRequestException(
+        'No puedes realizar un pago a tu propio código QR',
+      );
+    }
+
+    const idempotencyKey = `qr-${qrData.qrId}`;
+
+    return this.createTransfer(
+      payerUserId,
+      {
+        recipientCvu: qrData.recipient.cvu,
+        amount: qrData.amount,
+        category: qrData.category,
+      },
+      idempotencyKey,
+    );
+  }
+}

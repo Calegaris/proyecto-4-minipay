@@ -6,8 +6,10 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import { RefreshToken } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto, LoginDto, RefreshTokenDto } from './dto';
+import { WalletFactory } from '../wallets/factories';
 
 @Injectable()
 export class AuthService {
@@ -15,6 +17,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private walletFactory: WalletFactory,
   ) {}
 
   async register(registerDto: RegisterDto) {
@@ -33,7 +36,9 @@ export class AuthService {
     );
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
-    // Transacción atómica: Crear Usuario y su Billetera inicial
+    const initialWallet = this.walletFactory.createInitialWallet(name);
+
+    // Transacción atómica: Crear Usuario y su Billetera inicial con Alias y CVU
     const user = await this.prisma.$transaction(async (tx) => {
       const newUser = await tx.user.create({
         data: {
@@ -41,10 +46,7 @@ export class AuthService {
           email,
           passwordHash,
           wallet: {
-            create: {
-              currency: 'ARS',
-              balance: 0.0,
-            },
+            create: initialWallet,
           },
         },
         include: {
@@ -121,7 +123,7 @@ export class AuthService {
       },
     });
 
-    let matchedTokenRecord: (typeof userTokens)[0] | null = null;
+    let matchedTokenRecord: RefreshToken | null = null;
 
     for (const record of userTokens) {
       const isMatch = await bcrypt.compare(refreshToken, record.tokenHash);
@@ -181,7 +183,6 @@ export class AuthService {
       }
     }
 
-
     return { message: 'Sesión cerrada con éxito' };
   }
 
@@ -193,7 +194,6 @@ export class AuthService {
       expiresIn: (this.configService.get<string>('JWT_EXPIRES_IN') ??
         '15m') as any,
     });
-
 
     const refreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET');
     const refreshExpiresIn =
@@ -226,7 +226,3 @@ export class AuthService {
     };
   }
 }
-
-
-
-

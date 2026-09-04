@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Body,
   UseGuards,
   HttpCode,
@@ -14,7 +15,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
-import { ChangePasswordDto } from './dto';
+import { ChangePasswordDto, UpdateAvatarDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -43,6 +44,32 @@ export class UsersController {
     return this.usersService.getProfile(userId);
   }
 
+  @Patch('me/avatar')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Actualizar o eliminar foto de perfil (Avatar)',
+    description:
+      'Asigna una URL pública segura HTTPS para la foto de perfil del usuario autenticado, o null para eliminarla.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Foto de perfil actualizada exitosamente',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'URL inválida o con protocolo no seguro (se requiere HTTPS)',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'No autorizado / Token ausente o inválido',
+  })
+  async updateAvatar(
+    @CurrentUser('id') userId: string,
+    @Body() updateAvatarDto: UpdateAvatarDto,
+  ) {
+    return this.usersService.updateAvatar(userId, updateAvatarDto.avatarUrl);
+  }
+
   @Post('change-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -56,7 +83,8 @@ export class UsersController {
   })
   @ApiResponse({
     status: 400,
-    description: 'La nueva contraseña no cumple los requisitos o es idéntica a la anterior',
+    description:
+      'La nueva contraseña no cumple los requisitos o es idéntica a la anterior',
   })
   @ApiResponse({
     status: 401,

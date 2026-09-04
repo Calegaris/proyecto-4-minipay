@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { TransactionType, Prisma } from '@prisma/client';
+import { TransactionCategory, TransactionType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { DepositDto, TransactionQueryDto } from './dto';
 
@@ -39,6 +39,7 @@ export class WalletsService {
         data: {
           walletId: wallet.id,
           type: TransactionType.DEPOSIT,
+          category: TransactionCategory.OTHER,
           amount,
         },
       });
@@ -52,15 +53,19 @@ export class WalletsService {
     return result;
   }
 
-  async getTransactions(userId: string, query: TransactionQueryDto = new TransactionQueryDto()) {
+  async getTransactions(
+    userId: string,
+    query: TransactionQueryDto = new TransactionQueryDto(),
+  ) {
     const wallet = await this.getWallet(userId);
-    const { page = 1, limit = 10, type } = query;
+    const { page = 1, limit = 10, type, category } = query;
 
     const skip = (page - 1) * limit;
 
     const where: Prisma.TransactionWhereInput = {
       walletId: wallet.id,
       ...(type ? { type } : {}),
+      ...(category ? { category } : {}),
     };
 
     const [transactions, total] = await this.prisma.$transaction([
@@ -84,6 +89,121 @@ export class WalletsService {
         totalPages,
         hasNextPage: page < totalPages,
         hasPreviousPage: page > 1,
+      },
+    };
+  }
+
+  /**
+   * Obtiene métricas financieras y estadísticas agregadas en tiempo real
+   * para el mes actual e histórico utilizando el Ledger contable (Transaction).
+   */
+  async getWalletStats(userId: string) {
+    const wallet = await this.getWallet(userId);
+
+    const now = new Date();
+    const startOfMonth = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0),
+    );
+    const monthString = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+
+    // Ejecutar en paralelo 3 consultas agregadas sobre el Ledger
+    const [monthlyGroups, allTimeGroups, monthlyCategoryGroups] =
+      await Promise.all([
+        this.prisma.transaction.groupBy({
+          by: ['type'],
+          where: {
+            walletId: wallet.id,
+            createdAt: { gte: startOfMonth },
+          },
+          _sum: { amount: true },
+          _count: { id: true },
+        }),
+        this.prisma.transaction.groupBy({
+          by: ['type'],
+          where: {
+            walletId: wallet.id,
+          },
+          _sum: { amount: true },
+          _count: { id: true },
+        }),
+        this.prisma.transaction.groupBy({
+          by: ['category'],
+          where: {
+            walletId: wallet.id,
+            type: TransactionType.TRANSFER_SENT,
+            createdAt: { gte: startOfMonth },
+          },
+          _sum: { amount: true },
+        }),
+      ]);
+
+    const extractStats = (groups: typeof monthlyGroups) => {
+      let deposited = new Prisma.Decimal(0);
+      let sent = new Prisma.Decimal(0);
+      let received = new Prisma.Decimal(0);
+      let transactionCount = 0;
+
+      for (const group of groups) {
+        const sumAmount = group._sum.amount ?? new Prisma.Decimal(0);
+        transactionCount += group._count.id;
+
+        if (group.type === TransactionType.DEPOSIT) {
+          deposited = sumAmount;
+        } else if (group.type === TransactionType.TRANSFER_SENT) {
+          sent = sumAmount;
+        } else if (group.type === TransactionType.TRANSFER_RECEIVED) {
+          received = sumAmount;
+        }
+      }
+
+      // Flujo Neto de Caja = (Depósitos + Recibidos) - Transferidos
+      const netCashFlow = Prisma.Decimal.add(deposited, received).sub(sent);
+
+      return {
+        totalDeposited: Number(deposited.toFixed(2)),
+        totalTransferred: Number(sent.toFixed(2)),
+        totalReceived: Number(received.toFixed(2)),
+        netCashFlow: Number(netCashFlow.toFixed(2)),
+        transactionCount,
+      };
+    };
+
+    const monthlyStats = extractStats(monthlyGroups);
+    const allTimeStats = extractStats(allTimeGroups);
+
+    // Calcular desglose de egresos por categoría con protección de división por cero
+    const totalTransferredAmount = monthlyStats.totalTransferred;
+    const spendingByCategory = monthlyCategoryGroups.map((group) => {
+      const catTotalDecimal = group._sum.amount ?? new Prisma.Decimal(0);
+      const catTotal = Number(catTotalDecimal.toFixed(2));
+      let percentage = 0;
+      if (totalTransferredAmount > 0) {
+        percentage = Number(
+          ((catTotal / totalTransferredAmount) * 100).toFixed(2),
+        );
+      }
+      return {
+        category: group.category,
+        total: catTotal,
+        percentage,
+        percentageFormatted: `${percentage.toFixed(2)}%`,
+      };
+    });
+
+    return {
+      currentBalance: Number(wallet.balance),
+      currency: wallet.currency,
+      monthlySummary: {
+        month: monthString,
+        ...monthlyStats,
+        spendingByCategory,
+      },
+      allTimeSummary: {
+        totalDeposited: allTimeStats.totalDeposited,
+        totalTransferred: allTimeStats.totalTransferred,
+        totalReceived: allTimeStats.totalReceived,
+        netCashFlow: allTimeStats.netCashFlow,
+        totalOperationsCount: allTimeStats.transactionCount,
       },
     };
   }

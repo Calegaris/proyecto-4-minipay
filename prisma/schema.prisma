@@ -22,6 +22,17 @@ enum TransactionType {
   DEPOSIT
   TRANSFER_SENT
   TRANSFER_RECEIVED
+  YIELD
+}
+
+enum TransactionCategory {
+  SERVICES
+  FOOD
+  HOUSING
+  ENTERTAINMENT
+  GENERAL_TRANSFER
+  YIELD
+  OTHER
 }
 
 // --------------------------------------------------------------
@@ -33,57 +44,76 @@ model User {
   name          String
   email         String         @unique
   passwordHash  String
+  avatarUrl     String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   wallet        Wallet?
   refreshTokens RefreshToken[]
+  contacts      Contact[]      @relation("UserContacts")
+  savedByUsers  Contact[]      @relation("SavedByUsers")
 
   @@map("users")
 }
+
+
 
 model Wallet {
   id                String        @id @default(uuid())
   userId            String        @unique
   balance           Decimal       @default(0.0) @db.Decimal(12, 2)
   currency          String        @default("ARS")
+  alias             String        @unique
+  cvu               String        @unique @db.VarChar(22)
+  dailyTransferLimit Decimal       @default(100000.00) @db.Decimal(12, 2)
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
+
   user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions      Transaction[]
   sentTransfers     Transfer[]    @relation("SentTransfers")
   receivedTransfers Transfer[]    @relation("ReceivedTransfers")
 
+  @@index([alias])
+  @@index([cvu])
   @@map("wallets")
 }
 
+
 model Transfer {
-  id               String         @id @default(uuid())
+  id               String              @id @default(uuid())
   senderWalletId   String
   receiverWalletId String
-  amount           Decimal        @db.Decimal(12, 2)
-  status           TransferStatus @default(PENDING)
-  idempotencyKey   String?        @unique
-  createdAt        DateTime       @default(now())
+  amount           Decimal             @db.Decimal(12, 2)
+  status           TransferStatus      @default(PENDING)
+  category         TransactionCategory @default(GENERAL_TRANSFER)
+  idempotencyKey   String?             @unique
+  createdAt        DateTime            @default(now())
   completedAt      DateTime?
-  senderWallet     Wallet         @relation("SentTransfers", fields: [senderWalletId], references: [id])
-  receiverWallet   Wallet         @relation("ReceivedTransfers", fields: [receiverWalletId], references: [id])
+  senderWallet     Wallet              @relation("SentTransfers", fields: [senderWalletId], references: [id])
+  receiverWallet   Wallet              @relation("ReceivedTransfers", fields: [receiverWalletId], references: [id])
   transactions     Transaction[]
 
   @@map("transfers")
 }
 
 model Transaction {
-  id         String          @id @default(uuid())
+  id         String              @id @default(uuid())
   walletId   String
   transferId String?
   type       TransactionType
-  amount     Decimal         @db.Decimal(12, 2)
-  createdAt  DateTime        @default(now())
-  wallet     Wallet          @relation(fields: [walletId], references: [id], onDelete: Cascade)
-  transfer   Transfer?       @relation(fields: [transferId], references: [id], onDelete: SetNull)
+  category   TransactionCategory @default(GENERAL_TRANSFER)
+  amount     Decimal             @db.Decimal(12, 2)
+  createdAt  DateTime            @default(now())
+  wallet     Wallet              @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  transfer   Transfer?           @relation(fields: [transferId], references: [id], onDelete: SetNull)
 
+  @@index([walletId, type, createdAt])
+  @@index([walletId, category, createdAt])
+  @@index([walletId, createdAt])
   @@map("transactions")
 }
+
+
 
 model RefreshToken {
   id        String    @id @default(uuid())
@@ -96,3 +126,20 @@ model RefreshToken {
 
   @@map("refresh_tokens")
 }
+
+model Contact {
+  id              String   @id @default(uuid())
+  userId          String
+  contactUserId   String
+  aliasCustomName String   @db.VarChar(50)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user        User @relation("UserContacts", fields: [userId], references: [id], onDelete: Cascade)
+  contactUser User @relation("SavedByUsers", fields: [contactUserId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, contactUserId])
+  @@index([userId])
+  @@map("contacts")
+}
+

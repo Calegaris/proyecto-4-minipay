@@ -47,7 +47,7 @@ async function bootstrap() {
     .setDescription(
       'API RESTful de billetera digital con soporte de transferencias atómicas, autenticación JWT con rotación de refresh tokens e idempotencia.',
     )
-    .setVersion('1.0')
+    .setVersion('2.0.0')
     .addBearerAuth(
       {
         type: 'http',
@@ -67,7 +67,4 @@ async function bootstrap() {
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
 }
-bootstrap();
-
-
-
+void bootstrap();

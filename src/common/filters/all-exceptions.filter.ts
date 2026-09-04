@@ -44,11 +44,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
       }
     }
 
+    const correlationId =
+      request.correlationId ||
+      (response.getHeader('X-Correlation-ID') as string) ||
+      undefined;
+
     const errorResponse = {
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
       method: request.method,
+      correlationId,
       message,
       error,
     };

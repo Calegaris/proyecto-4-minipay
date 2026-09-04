@@ -28,8 +28,10 @@ describe('TransfersModule (e2e)', () => {
   };
 
   let senderToken: string;
+  let receiverToken: string;
   let thirdPartyToken: string;
   let createdTransferId: string;
+  let receiverWallet: any;
   const idempotencyKey = 'transfer-key-test-12345';
 
   beforeAll(async () => {
@@ -68,14 +70,17 @@ describe('TransfersModule (e2e)', () => {
       .send({ amount: 10000 });
 
     // 2. Registrar Receiver
-    await request(app.getHttpServer())
+    const receiverReg = await request(app.getHttpServer())
       .post('/auth/register')
       .send(receiverUser);
+    receiverWallet = receiverReg.body.user.wallet;
+    receiverToken = receiverReg.body.tokens.accessToken;
 
     // 3. Registrar Third Party User
     const thirdPartyReg = await request(app.getHttpServer())
       .post('/auth/register')
       .send(thirdPartyUser);
+
     thirdPartyToken = thirdPartyReg.body.tokens.accessToken;
   });
 
@@ -88,7 +93,6 @@ describe('TransfersModule (e2e)', () => {
     ]);
     await app.close();
   });
-
 
   describe('POST /transfers (Transferencias & Reglas de Negocio)', () => {
     it('debe ejecutar una transferencia válida atómicamente y actualizar ambos saldos', async () => {
@@ -107,6 +111,7 @@ describe('TransfersModule (e2e)', () => {
       expect(response.body).toHaveProperty('id');
       expect(response.body.amount).toBe('2500');
       expect(response.body.status).toBe('COMPLETED');
+      expect(response.body.category).toBe('GENERAL_TRANSFER');
       expect(response.body.idempotencyKey).toBe(idempotencyKey);
 
       createdTransferId = response.body.id;
@@ -152,6 +157,20 @@ describe('TransfersModule (e2e)', () => {
         .expect(400);
     });
 
+    it('debe permitir asignar una categoría de gasto explícita a la transferencia (ej. SERVICES)', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/transfers')
+        .set('Authorization', `Bearer ${senderToken}`)
+        .send({
+          recipientEmail: receiverUser.email,
+          amount: 500,
+          category: 'SERVICES',
+        })
+        .expect(200);
+
+      expect(response.body.category).toBe('SERVICES');
+    });
+
     it('debe rechazar transferencias con saldo insuficiente con 409 Conflict', async () => {
       await request(app.getHttpServer())
         .post('/transfers')
@@ -184,6 +203,67 @@ describe('TransfersModule (e2e)', () => {
         })
         .expect(404);
     });
+
+    it('debe permitir transferir dinero utilizando el Alias del destinatario', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/transfers')
+        .set('Authorization', `Bearer ${senderToken}`)
+        .send({
+          recipientAlias: receiverWallet.alias,
+          amount: 500,
+        })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('id');
+      expect(response.body.amount).toBe('500');
+    });
+
+    it('debe permitir transferir dinero utilizando el CVU del destinatario', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/transfers')
+        .set('Authorization', `Bearer ${senderToken}`)
+        .send({
+          recipientCvu: receiverWallet.cvu,
+          amount: 500,
+        })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('id');
+      expect(response.body.amount).toBe('500');
+    });
+
+    it('debe rechazar transferencias que excedan el límite operativo diario con 422 Unprocessable Entity', async () => {
+      const senderDbUser = await prisma.user.findUnique({
+        where: { email: senderUser.email },
+        include: { wallet: true },
+      });
+
+      // Ajustamos temporalmente el límite diario a $1.000 ARS
+      await prisma.wallet.update({
+        where: { id: senderDbUser!.wallet!.id },
+        data: { dailyTransferLimit: 1000.0 },
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/transfers')
+        .set('Authorization', `Bearer ${senderToken}`)
+        .send({
+          recipientEmail: receiverUser.email,
+          amount: 1500,
+        })
+        .expect(422);
+
+      expect(response.body.message).toContain(
+        'Límite operativo diario excedido',
+      );
+      expect(response.body.message).toContain('Cupo disponible restante');
+
+      // Restaurar el límite por defecto a $100.000 ARS
+      await prisma.wallet.update({
+        where: { id: senderDbUser!.wallet!.id },
+        data: { dailyTransferLimit: 100000.0 },
+      });
+    });
   });
 
   describe('GET /transfers/:id (Autorización)', () => {
@@ -215,11 +295,179 @@ describe('TransfersModule (e2e)', () => {
       expect(response.body).toHaveProperty('meta');
       expect(Array.isArray(response.body.data)).toBe(true);
       expect(response.body.data.length).toBeGreaterThanOrEqual(1);
-      expect(response.body.data[0].id).toBe(createdTransferId);
+      expect(
+        response.body.data.some((t: any) => t.id === createdTransferId),
+      ).toBe(true);
       expect(response.body.meta).toHaveProperty('total');
       expect(response.body.meta.page).toBe(1);
       expect(response.body.meta.limit).toBe(5);
     });
   });
 
+  describe('GET /transfers/:id/receipt (Comprobantes en PDF)', () => {
+    it('el remitente debe poder descargar el comprobante bancario en PDF', async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/transfers/${createdTransferId}/receipt`)
+        .set('Authorization', `Bearer ${senderToken}`)
+        .expect(200);
+
+      expect(response.headers['content-type']).toContain('application/pdf');
+      expect(response.headers['content-disposition']).toContain('attachment');
+      expect(response.headers['content-disposition']).toContain(
+        `comprobante-transferencia-${createdTransferId}.pdf`,
+      );
+      expect(Buffer.isBuffer(response.body) || response.body.length > 0).toBe(
+        true,
+      );
+    });
+
+    it('el destinatario debe poder descargar el mismo comprobante en PDF', async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/transfers/${createdTransferId}/receipt`)
+        .set('Authorization', `Bearer ${receiverToken}`)
+        .expect(200);
+
+      expect(response.headers['content-type']).toContain('application/pdf');
+      expect(response.headers['content-disposition']).toContain('attachment');
+    });
+
+    it('un usuario tercero debe recibir 403 Forbidden al intentar descargar el comprobante', async () => {
+      await request(app.getHttpServer())
+        .get(`/transfers/${createdTransferId}/receipt`)
+        .set('Authorization', `Bearer ${thirdPartyToken}`)
+        .expect(403);
+    });
+
+    it('debe retornar 404 Not Found si la transferencia no existe', async () => {
+      await request(app.getHttpServer())
+        .get('/transfers/00000000-0000-0000-0000-000000000000/receipt')
+        .set('Authorization', `Bearer ${senderToken}`)
+        .expect(404);
+    });
+  });
+
+  describe('Dynamic QR Payments (/transfers/qr)', () => {
+    let generatedQrCode: string;
+    const qrAmount = 300;
+
+    it('debe generar un código QR de cobro exitosamente (POST /transfers/qr/generate)', async () => {
+      // El receiver genera un código QR para cobrar $300 de ALIMENTOS
+      const response = await request(app.getHttpServer())
+        .post('/transfers/qr/generate')
+        .set('Authorization', `Bearer ${receiverToken}`)
+        .send({
+          amount: qrAmount,
+          concept: 'Almuerzo ejecutivo',
+          category: 'FOOD',
+          expiresInMinutes: 15,
+        })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('qrCode');
+      expect(response.body).toHaveProperty('qrData');
+      expect(response.body).toHaveProperty('expiresAt');
+      expect(response.body.qrData.amount).toBe(qrAmount);
+      expect(response.body.qrData.category).toBe('FOOD');
+      expect(response.body.qrData.concept).toBe('Almuerzo ejecutivo');
+      expect(response.body.qrData.recipientCvu).toBe(receiverWallet.cvu);
+
+      generatedQrCode = response.body.qrCode;
+    });
+
+    it('debe decodificar y previsualizar los datos del código QR (POST /transfers/qr/decode)', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/transfers/qr/decode')
+        .set('Authorization', `Bearer ${senderToken}`)
+        .send({ qrCode: generatedQrCode })
+        .expect(200);
+
+      expect(response.body.valid).toBe(true);
+      expect(response.body.expired).toBe(false);
+      expect(response.body.alreadyPaid).toBe(false);
+      expect(response.body.amount).toBe(qrAmount);
+      expect(response.body.category).toBe('FOOD');
+      expect(response.body.concept).toBe('Almuerzo ejecutivo');
+      expect(response.body.recipient.cvu).toBe(receiverWallet.cvu);
+    });
+
+    it('debe ejecutar el pago de una orden QR exitosamente y actualizar saldos (POST /transfers/qr/pay)', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/transfers/qr/pay')
+        .set('Authorization', `Bearer ${senderToken}`)
+        .send({ qrCode: generatedQrCode })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('id');
+      expect(response.body.amount).toBe(qrAmount.toString());
+      expect(response.body.status).toBe('COMPLETED');
+      expect(response.body.category).toBe('FOOD');
+    });
+
+    it('PREVENCIÓN DE REPLAY ATTACK: intentar pagar dos veces el mismo código QR debe responder con 409 Conflict', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/transfers/qr/pay')
+        .set('Authorization', `Bearer ${senderToken}`)
+        .send({ qrCode: generatedQrCode })
+        .expect(409);
+
+      expect(response.body.message).toContain('ya fue cobrado');
+    });
+
+    it('debe rechazar un código QR alterado / manipulado en su contenido (400 Bad Request)', async () => {
+      // Decodificar el Base64, alterar el monto de 300 a 99999 sin rehacer la firma
+      const decodedString = Buffer.from(generatedQrCode, 'base64').toString(
+        'utf-8',
+      );
+      const tamperedObj = JSON.parse(decodedString);
+      tamperedObj.amount = 99999;
+      const tamperedQrCode = Buffer.from(JSON.stringify(tamperedObj)).toString(
+        'base64',
+      );
+
+      const response = await request(app.getHttpServer())
+        .post('/transfers/qr/pay')
+        .set('Authorization', `Bearer ${senderToken}`)
+        .send({ qrCode: tamperedQrCode })
+        .expect(400);
+
+      expect(response.body.message).toContain('inválido o alterado');
+    });
+
+    it('debe rechazar un código QR con firma truncada sin provocar 500 (400 Bad Request)', async () => {
+      const decodedString = Buffer.from(generatedQrCode, 'base64').toString(
+        'utf-8',
+      );
+      const tamperedObj = JSON.parse(decodedString);
+      tamperedObj.signature = 'abcd'; // Firma truncada de longitud diferente
+      const tamperedQrCode = Buffer.from(JSON.stringify(tamperedObj)).toString(
+        'base64',
+      );
+
+      const response = await request(app.getHttpServer())
+        .post('/transfers/qr/pay')
+        .set('Authorization', `Bearer ${senderToken}`)
+        .send({ qrCode: tamperedQrCode })
+        .expect(400);
+
+      expect(response.body.message).toContain('inválido o alterado');
+    });
+
+    it('debe rechazar el auto-pago de un código QR generado por uno mismo (400 Bad Request)', async () => {
+      // El sender genera su propio QR
+      const selfQrRes = await request(app.getHttpServer())
+        .post('/transfers/qr/generate')
+        .set('Authorization', `Bearer ${senderToken}`)
+        .send({ amount: 100 })
+        .expect(200);
+
+      // El sender intenta pagarse a sí mismo
+      const payRes = await request(app.getHttpServer())
+        .post('/transfers/qr/pay')
+        .set('Authorization', `Bearer ${senderToken}`)
+        .send({ qrCode: selfQrRes.body.qrCode })
+        .expect(400);
+
+      expect(payRes.body.message).toContain('tu propio código QR');
+    });
+  });
 });

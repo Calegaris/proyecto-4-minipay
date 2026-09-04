@@ -19,6 +19,7 @@ export class UsersService {
         id: true,
         name: true,
         email: true,
+        avatarUrl: true,
         createdAt: true,
         updatedAt: true,
         wallet: {
@@ -26,6 +27,8 @@ export class UsersService {
             id: true,
             balance: true,
             currency: true,
+            alias: true,
+            cvu: true,
           },
         },
       },
@@ -36,6 +39,27 @@ export class UsersService {
     }
 
     return user;
+  }
+
+  async updateAvatar(userId: string, avatarUrl?: string | null) {
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: { avatarUrl: avatarUrl ?? null },
+      include: {
+        wallet: {
+          select: {
+            id: true,
+            balance: true,
+            currency: true,
+            alias: true,
+            cvu: true,
+          },
+        },
+      },
+    });
+
+    const { passwordHash: _passwordHash, ...sanitizedUser } = user;
+    return sanitizedUser;
   }
 
   async changePassword(userId: string, changePasswordDto: ChangePasswordDto) {
@@ -86,7 +110,6 @@ export class UsersService {
           revokedAt: new Date(),
         },
       });
-
     });
 
     return {
