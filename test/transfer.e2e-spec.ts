@@ -171,7 +171,6 @@ describe('TransfersModule (e2e)', () => {
       expect(response.body.category).toBe('SERVICES');
     });
 
-
     it('debe rechazar transferencias con saldo insuficiente con 409 Conflict', async () => {
       await request(app.getHttpServer())
         .post('/transfers')
@@ -344,6 +343,131 @@ describe('TransfersModule (e2e)', () => {
         .get('/transfers/00000000-0000-0000-0000-000000000000/receipt')
         .set('Authorization', `Bearer ${senderToken}`)
         .expect(404);
+    });
+  });
+
+  describe('Dynamic QR Payments (/transfers/qr)', () => {
+    let generatedQrCode: string;
+    const qrAmount = 300;
+
+    it('debe generar un código QR de cobro exitosamente (POST /transfers/qr/generate)', async () => {
+      // El receiver genera un código QR para cobrar $300 de ALIMENTOS
+      const response = await request(app.getHttpServer())
+        .post('/transfers/qr/generate')
+        .set('Authorization', `Bearer ${receiverToken}`)
+        .send({
+          amount: qrAmount,
+          concept: 'Almuerzo ejecutivo',
+          category: 'FOOD',
+          expiresInMinutes: 15,
+        })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('qrCode');
+      expect(response.body).toHaveProperty('qrData');
+      expect(response.body).toHaveProperty('expiresAt');
+      expect(response.body.qrData.amount).toBe(qrAmount);
+      expect(response.body.qrData.category).toBe('FOOD');
+      expect(response.body.qrData.concept).toBe('Almuerzo ejecutivo');
+      expect(response.body.qrData.recipientCvu).toBe(receiverWallet.cvu);
+
+      generatedQrCode = response.body.qrCode;
+    });
+
+    it('debe decodificar y previsualizar los datos del código QR (POST /transfers/qr/decode)', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/transfers/qr/decode')
+        .set('Authorization', `Bearer ${senderToken}`)
+        .send({ qrCode: generatedQrCode })
+        .expect(200);
+
+      expect(response.body.valid).toBe(true);
+      expect(response.body.expired).toBe(false);
+      expect(response.body.alreadyPaid).toBe(false);
+      expect(response.body.amount).toBe(qrAmount);
+      expect(response.body.category).toBe('FOOD');
+      expect(response.body.concept).toBe('Almuerzo ejecutivo');
+      expect(response.body.recipient.cvu).toBe(receiverWallet.cvu);
+    });
+
+    it('debe ejecutar el pago de una orden QR exitosamente y actualizar saldos (POST /transfers/qr/pay)', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/transfers/qr/pay')
+        .set('Authorization', `Bearer ${senderToken}`)
+        .send({ qrCode: generatedQrCode })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('id');
+      expect(response.body.amount).toBe(qrAmount.toString());
+      expect(response.body.status).toBe('COMPLETED');
+      expect(response.body.category).toBe('FOOD');
+    });
+
+    it('PREVENCIÓN DE REPLAY ATTACK: intentar pagar dos veces el mismo código QR debe responder con 409 Conflict', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/transfers/qr/pay')
+        .set('Authorization', `Bearer ${senderToken}`)
+        .send({ qrCode: generatedQrCode })
+        .expect(409);
+
+      expect(response.body.message).toContain('ya fue cobrado');
+    });
+
+    it('debe rechazar un código QR alterado / manipulado en su contenido (400 Bad Request)', async () => {
+      // Decodificar el Base64, alterar el monto de 300 a 99999 sin rehacer la firma
+      const decodedString = Buffer.from(generatedQrCode, 'base64').toString(
+        'utf-8',
+      );
+      const tamperedObj = JSON.parse(decodedString);
+      tamperedObj.amount = 99999;
+      const tamperedQrCode = Buffer.from(JSON.stringify(tamperedObj)).toString(
+        'base64',
+      );
+
+      const response = await request(app.getHttpServer())
+        .post('/transfers/qr/pay')
+        .set('Authorization', `Bearer ${senderToken}`)
+        .send({ qrCode: tamperedQrCode })
+        .expect(400);
+
+      expect(response.body.message).toContain('inválido o alterado');
+    });
+
+    it('debe rechazar un código QR con firma truncada sin provocar 500 (400 Bad Request)', async () => {
+      const decodedString = Buffer.from(generatedQrCode, 'base64').toString(
+        'utf-8',
+      );
+      const tamperedObj = JSON.parse(decodedString);
+      tamperedObj.signature = 'abcd'; // Firma truncada de longitud diferente
+      const tamperedQrCode = Buffer.from(JSON.stringify(tamperedObj)).toString(
+        'base64',
+      );
+
+      const response = await request(app.getHttpServer())
+        .post('/transfers/qr/pay')
+        .set('Authorization', `Bearer ${senderToken}`)
+        .send({ qrCode: tamperedQrCode })
+        .expect(400);
+
+      expect(response.body.message).toContain('inválido o alterado');
+    });
+
+    it('debe rechazar el auto-pago de un código QR generado por uno mismo (400 Bad Request)', async () => {
+      // El sender genera su propio QR
+      const selfQrRes = await request(app.getHttpServer())
+        .post('/transfers/qr/generate')
+        .set('Authorization', `Bearer ${senderToken}`)
+        .send({ amount: 100 })
+        .expect(200);
+
+      // El sender intenta pagarse a sí mismo
+      const payRes = await request(app.getHttpServer())
+        .post('/transfers/qr/pay')
+        .set('Authorization', `Bearer ${senderToken}`)
+        .send({ qrCode: selfQrRes.body.qrCode })
+        .expect(400);
+
+      expect(payRes.body.message).toContain('tu propio código QR');
     });
   });
 });
