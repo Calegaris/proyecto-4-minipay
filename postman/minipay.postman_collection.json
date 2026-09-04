@@ -1,0 +1,658 @@
+{
+  "info": {
+    "_postman_id": "minipay-wallet-api-v1",
+    "name": "MiniPay Digital Wallet API",
+    "description": "Suite completa de endpoints para MiniPay Digital Wallet. Incluye autenticación con refresh tokens, billetera con CVU/Alias, transferencias atómicas e idempotentes, comprobantes bancarios en PDF, agenda de contactos, cuenta remunerada con 35% TNA, pagos con códigos QR dinámicos firmados con HMAC y analítica financiera.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "01. Authentication & Security",
+      "item": [
+        {
+          "name": "Register User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.tokens && res.tokens.accessToken) {",
+                  "    pm.environment.set(\"accessToken\", res.tokens.accessToken);",
+                  "    pm.environment.set(\"refreshToken\", res.tokens.refreshToken);",
+                  "    pm.environment.set(\"userId\", res.user.id);",
+                  "    pm.environment.set(\"userEmail\", res.user.email);",
+                  "    if (res.user.wallet) {",
+                  "        pm.environment.set(\"userCvu\", res.user.wallet.cvu);",
+                  "        pm.environment.set(\"userAlias\", res.user.wallet.alias);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Lucas Calegaris\",\n  \"email\": \"usuario_{{$timestamp}}@minipay.com\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            },
+            "description": "Registra un nuevo usuario en MiniPay y genera automáticamente su billetera con CVU único de 22 dígitos y Alias aleatorio."
+          }
+        },
+        {
+          "name": "Login User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.tokens && res.tokens.accessToken) {",
+                  "    pm.environment.set(\"accessToken\", res.tokens.accessToken);",
+                  "    pm.environment.set(\"refreshToken\", res.tokens.refreshToken);",
+                  "    pm.environment.set(\"userId\", res.user.id);",
+                  "    pm.environment.set(\"userEmail\", res.user.email);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Inicia sesión con credenciales y emite un nuevo par de Access Token (15m) y Refresh Token (7d)."
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.tokens && res.tokens.accessToken) {",
+                  "    pm.environment.set(\"accessToken\", res.tokens.accessToken);",
+                  "    pm.environment.set(\"refreshToken\", res.tokens.refreshToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{refreshToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "refresh"]
+            },
+            "description": "Rota el Refresh Token con verificación en base de datos y entrega un nuevo par de tokens."
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "logout"]
+            },
+            "description": "Revoca los Refresh Tokens activos del usuario para cerrar la sesión de forma segura."
+          }
+        }
+      ]
+    },
+    {
+      "name": "02. Users & Profile",
+      "item": [
+        {
+          "name": "Get My Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.wallet) {",
+                  "    pm.environment.set(\"userCvu\", res.wallet.cvu);",
+                  "    pm.environment.set(\"userAlias\", res.wallet.alias);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "me"]
+            },
+            "description": "Retorna la información del usuario autenticado y su billetera sin exponer el passwordHash."
+          }
+        },
+        {
+          "name": "Update Avatar (HTTPS)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"avatarUrl\": \"https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/me/avatar",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "me", "avatar"]
+            },
+            "description": "Actualiza la foto de perfil del usuario guardando la URL pública segura HTTPS entregada por un CDN/Cloud Storage."
+          }
+        },
+        {
+          "name": "Reset Avatar (Remove Photo)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"avatarUrl\": null\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/me/avatar",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "me", "avatar"]
+            },
+            "description": "Elimina la foto de perfil actual enviando null para volver al avatar por defecto."
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"Password123!\",\n  \"newPassword\": \"NewPassword456!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/change-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "change-password"]
+            },
+            "description": "Cambia la contraseña del usuario y revoca todas las demás sesiones activas por seguridad."
+          }
+        }
+      ]
+    },
+    {
+      "name": "03. Wallets & Balance",
+      "item": [
+        {
+          "name": "Get Wallet Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/wallet",
+              "host": ["{{baseUrl}}"],
+              "path": ["wallet"]
+            },
+            "description": "Consulta el saldo disponible en ARS, alias, CVU y límite operativo diario."
+          }
+        },
+        {
+          "name": "Deposit Funds",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 10000\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wallet/deposit",
+              "host": ["{{baseUrl}}"],
+              "path": ["wallet", "deposit"]
+            },
+            "description": "Acredita saldo ficticio en la billetera y genera un registro de tipo DEPOSIT en el Ledger contable."
+          }
+        },
+        {
+          "name": "Get Transactions History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/wallet/transactions?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["wallet", "transactions"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Lista los movimientos contables paginados (DEPOSIT, TRANSFER_SENT, TRANSFER_RECEIVED, YIELD)."
+          }
+        },
+        {
+          "name": "Filter Transactions by Category",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/wallet/transactions?category=FOOD&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["wallet", "transactions"],
+              "query": [
+                {
+                  "key": "category",
+                  "value": "FOOD"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Filtra el historial de transacciones por rubro de gasto (SERVICES, FOOD, HOUSING, ENTERTAINMENT, GENERAL_TRANSFER, YIELD, OTHER)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "04. Transfers",
+      "item": [
+        {
+          "name": "Create Transfer (with Dynamic Idempotency-Key)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.id) {",
+                  "    pm.environment.set(\"transferId\", res.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}",
+                "description": "Genera un UUID único automático en cada clic para garantizar idempotencia y evitar duplicados"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipientEmail\": \"{{recipientEmail}}\",\n  \"amount\": 1500,\n  \"category\": \"FOOD\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/transfers",
+              "host": ["{{baseUrl}}"],
+              "path": ["transfers"]
+            },
+            "description": "Ejecuta una transferencia atómica entre billeteras debitando al emisor y acreditando al receptor. Valida límite diario e idempotencia."
+          }
+        },
+        {
+          "name": "Get Transfer by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/transfers/{{transferId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["transfers", "{{transferId}}"]
+            },
+            "description": "Consulta el detalle completo de una transferencia. Solo accesible para el emisor o receptor."
+          }
+        },
+        {
+          "name": "Get Transfers List",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/transfers?page=1&limit=10&status=COMPLETED",
+              "host": ["{{baseUrl}}"],
+              "path": ["transfers"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "status",
+                  "value": "COMPLETED"
+                }
+              ]
+            },
+            "description": "Historial de transferencias enviadas y recibidas con soporte para paginación y filtro de estado."
+          }
+        }
+      ]
+    },
+    {
+      "name": "05. PDF Receipts",
+      "item": [
+        {
+          "name": "Download Transfer Receipt (PDF Stream)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/transfers/{{transferId}}/receipt",
+              "host": ["{{baseUrl}}"],
+              "path": ["transfers", "{{transferId}}", "receipt"]
+            },
+            "description": "Genera en tiempo real y descarga en streaming el comprobante bancario oficial en PDF. (Nota: en Postman, usar 'Send and Download' junto al botón Send para guardar el archivo .pdf en disco)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "06. Contacts Directory",
+      "item": [
+        {
+          "name": "Add Contact",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.id) {",
+                  "    pm.environment.set(\"contactId\", res.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{recipientEmail}}\",\n  \"customName\": \"Mi Contacto Frecuente\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/contacts",
+              "host": ["{{baseUrl}}"],
+              "path": ["contacts"]
+            },
+            "description": "Agrega un usuario a la agenda de contactos mediante email, alias o CVU con detección de auto-agregación."
+          }
+        },
+        {
+          "name": "List Contacts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/contacts",
+              "host": ["{{baseUrl}}"],
+              "path": ["contacts"]
+            },
+            "description": "Obtiene la lista de contactos agendados con su CVU, alias y nombre personalizado."
+          }
+        },
+        {
+          "name": "Delete Contact",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/contacts/{{contactId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["contacts", "{{contactId}}"]
+            },
+            "description": "Elimina un contacto de la agenda del usuario autenticado."
+          }
+        }
+      ]
+    },
+    {
+      "name": "07. Yields Engine (Cuenta Remunerada)",
+      "item": [
+        {
+          "name": "Get Yields Summary & Projections",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/wallet/yields",
+              "host": ["{{baseUrl}}"],
+              "path": ["wallet", "yields"]
+            },
+            "description": "Retorna la TNA actual (35.00%), rendimientos acumulados históricos y proyecciones diarias, mensuales y anuales."
+          }
+        },
+        {
+          "name": "Simulate Daily Yield (Manual)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/wallet/simulate-yield",
+              "host": ["{{baseUrl}}"],
+              "path": ["wallet", "simulate-yield"]
+            },
+            "description": "Acredita manualmente 1 día de rendimiento sobre el saldo de la billetera con verificación estricta de idempotencia diaria UTC."
+          }
+        }
+      ]
+    },
+    {
+      "name": "08. Dynamic QR Payments",
+      "item": [
+        {
+          "name": "Generate Dynamic QR Code",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.qrCode) {",
+                  "    pm.environment.set(\"qrCode\", res.qrCode);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 750,\n  \"concept\": \"Almuerzo Ejecutivo\",\n  \"category\": \"FOOD\",\n  \"expiresInMinutes\": 15\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/transfers/qr/generate",
+              "host": ["{{baseUrl}}"],
+              "path": ["transfers", "qr", "generate"]
+            },
+            "description": "Genera una orden de cobro con código QR firmada criptográficamente con HMAC-SHA256 y TTL de 15 minutos."
+          }
+        },
+        {
+          "name": "Decode / Preview QR Code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"qrCode\": \"{{qrCode}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/transfers/qr/decode",
+              "host": ["{{baseUrl}}"],
+              "path": ["transfers", "qr", "decode"]
+            },
+            "description": "Decodifica y valida la firma HMAC del código QR, verificando si está expirado o si ya fue cobrado antes de confirmar el pago."
+          }
+        },
+        {
+          "name": "Pay QR Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"qrCode\": \"{{qrCode}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/transfers/qr/pay",
+              "host": ["{{baseUrl}}"],
+              "path": ["transfers", "qr", "pay"]
+            },
+            "description": "Paga la orden escaneada. Valida firma en tiempo constante, previene auto-pago y bloquea Replay Attacks con 409 Conflict."
+          }
+        }
+      ]
+    },
+    {
+      "name": "09. Financial Analytics",
+      "item": [
+        {
+          "name": "Get Wallet Stats & Spending by Category",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/wallet/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["wallet", "stats"]
+            },
+            "description": "Retorna métricas de flujo neto de caja mensual/histórico y desglose de gastos por categoría (spendingByCategory) con porcentajes y montos."
+          }
+        }
+      ]
+    }
+  ]
+}
