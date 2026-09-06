@@ -49,8 +49,12 @@ export class ContactsService {
    * por Email, Alias o CVU.
    */
   async createContact(userId: string, createContactDto: CreateContactDto) {
-    const { aliasCustomName, contactEmail, contactAlias, contactCvu } =
-      createContactDto;
+    const aliasCustomName = createContactDto.aliasCustomName;
+    const contactEmail =
+      createContactDto.contactEmail || createContactDto.email;
+    const contactAlias =
+      createContactDto.contactAlias || createContactDto.alias;
+    const contactCvu = createContactDto.contactCvu || createContactDto.cvu;
 
     // 1. Validación de identificador obligatorio
     if (!contactEmail && !contactAlias && !contactCvu) {
