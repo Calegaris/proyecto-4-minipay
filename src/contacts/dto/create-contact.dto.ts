@@ -48,4 +48,17 @@ export class CreateContactDto {
   @IsString({ message: 'El CVU del contacto debe ser un texto' })
   @Length(22, 22, { message: 'El CVU debe tener exactamente 22 dígitos' })
   contactCvu?: string;
+
+  @IsOptional()
+  @IsEmail({}, { message: 'El email del contacto no es válido' })
+  email?: string;
+
+  @IsOptional()
+  @IsString({ message: 'El alias del contacto debe ser un texto' })
+  alias?: string;
+
+  @IsOptional()
+  @IsString({ message: 'El CVU del contacto debe ser un texto' })
+  @Length(22, 22, { message: 'El CVU debe tener exactamente 22 dígitos' })
+  cvu?: string;
 }
