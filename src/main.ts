@@ -13,9 +13,11 @@ async function bootstrap() {
   app.use(helmet());
 
   // 2. Configuración explícita de CORS
-  const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
+  const rawOrigins =
+    process.env.CORS_ORIGIN || 'http://localhost:3001,http://localhost:5173';
+  const allowedOrigins = rawOrigins.split(',').map((o) => o.trim());
   app.enableCors({
-    origin: allowedOrigin,
+    origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],

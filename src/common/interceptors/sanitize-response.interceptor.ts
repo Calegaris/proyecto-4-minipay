@@ -17,6 +17,11 @@ function sanitize(data: any): any {
   }
 
   if (typeof data === 'object' && !(data instanceof Date)) {
+    // Si es un objeto Decimal de Prisma, convertir a número nativo
+    if (typeof data.toNumber === 'function') {
+      return data.toNumber();
+    }
+
     const cleanObject: Record<string, any> = {};
     for (const [key, value] of Object.entries(data)) {
       if (key === 'passwordHash' || key === 'password') {

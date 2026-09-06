@@ -66,6 +66,9 @@ export class AuthService {
         email: user.email,
         wallet: user.wallet,
       },
+      wallet: user.wallet,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       tokens,
     };
   }
@@ -98,6 +101,9 @@ export class AuthService {
         email: user.email,
         wallet: user.wallet,
       },
+      wallet: user.wallet,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       tokens,
     };
   }
@@ -151,7 +157,11 @@ export class AuthService {
       payload.email,
     );
 
-    return newTokens;
+    return {
+      accessToken: newTokens.accessToken,
+      refreshToken: newTokens.refreshToken,
+      tokens: newTokens,
+    };
   }
 
   async logout(refreshTokenDto: RefreshTokenDto) {
