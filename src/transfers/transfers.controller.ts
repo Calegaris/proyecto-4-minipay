@@ -10,7 +10,6 @@ import {
   HttpCode,
   HttpStatus,
   Res,
-  StreamableFile,
   ParseUUIDPipe,
 } from '@nestjs/common';
 import type { Response } from 'express';
@@ -215,20 +214,18 @@ export class TransfersController {
   async downloadReceipt(
     @CurrentUser('id') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<StreamableFile> {
+    @Res() res: Response,
+  ): Promise<void> {
     const { buffer, filename } = await this.transfersService.getTransferReceipt(
       userId,
       id,
     );
 
-    res.set({
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="${filename}"`,
-      'Content-Length': buffer.length.toString(),
-    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', buffer.length.toString());
 
-    return new StreamableFile(buffer);
+    res.end(buffer);
   }
 
   @Get(':id')
