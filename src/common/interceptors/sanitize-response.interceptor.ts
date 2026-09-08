@@ -12,6 +12,11 @@ function sanitize(data: any): any {
     return data;
   }
 
+  // Si es un Buffer o Stream binario, devolverlo sin procesar
+  if (Buffer.isBuffer(data)) {
+    return data;
+  }
+
   if (Array.isArray(data)) {
     return data.map((item) => sanitize(item));
   }
