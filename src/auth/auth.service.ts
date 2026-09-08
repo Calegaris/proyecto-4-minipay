@@ -112,9 +112,14 @@ export class AuthService {
     const { refreshToken } = refreshTokenDto;
 
     let payload: { sub: string; email: string };
+    const refreshSecret =
+      this.configService.get<string>('JWT_REFRESH_SECRET') ??
+      this.configService.get<string>('JWT_SECRET') ??
+      'minipay-default-refresh-jwt-secret-key-32chars!';
+
     try {
       payload = this.jwtService.verify(refreshToken, {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+        secret: refreshSecret,
       });
     } catch {
       throw new UnauthorizedException('Refresh token inválido o expirado');
@@ -167,10 +172,15 @@ export class AuthService {
   async logout(refreshTokenDto: RefreshTokenDto) {
     const { refreshToken } = refreshTokenDto;
 
+    const refreshSecret =
+      this.configService.get<string>('JWT_REFRESH_SECRET') ??
+      this.configService.get<string>('JWT_SECRET') ??
+      'minipay-default-refresh-jwt-secret-key-32chars!';
+
     let payload: { sub: string; email: string };
     try {
       payload = this.jwtService.verify(refreshToken, {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+        secret: refreshSecret,
       });
     } catch {
       return { message: 'Sesión cerrada con éxito' };
@@ -199,13 +209,22 @@ export class AuthService {
   private async generateAndSaveTokens(userId: string, email: string) {
     const payload = { sub: userId, email, jti: crypto.randomUUID() };
 
+    const accessSecret =
+      this.configService.get<string>('JWT_SECRET') ??
+      this.configService.get<string>('JWT_ACCESS_SECRET') ??
+      'minipay-default-access-jwt-secret-key-32chars!';
+
+    const refreshSecret =
+      this.configService.get<string>('JWT_REFRESH_SECRET') ??
+      this.configService.get<string>('JWT_SECRET') ??
+      'minipay-default-refresh-jwt-secret-key-32chars!';
+
     const accessToken = this.jwtService.sign(payload, {
-      secret: this.configService.get<string>('JWT_SECRET'),
+      secret: accessSecret,
       expiresIn: (this.configService.get<string>('JWT_EXPIRES_IN') ??
         '15m') as any,
     });
 
-    const refreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET');
     const refreshExpiresIn =
       this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') ?? '7d';
 

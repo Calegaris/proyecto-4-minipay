@@ -15,7 +15,10 @@ import { WalletsModule } from '../wallets/wallets.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
+        secret:
+          configService.get<string>('JWT_SECRET') ??
+          configService.get<string>('JWT_ACCESS_SECRET') ??
+          'minipay-default-access-jwt-secret-key-32chars!',
         signOptions: {
           expiresIn: (configService.get<string>('JWT_EXPIRES_IN') ??
             '15m') as any,

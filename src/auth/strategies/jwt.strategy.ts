@@ -18,7 +18,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('JWT_SECRET') ?? 'fallback-secret',
+      secretOrKey:
+        configService.get<string>('JWT_SECRET') ??
+        configService.get<string>('JWT_ACCESS_SECRET') ??
+        'minipay-default-access-jwt-secret-key-32chars!',
     });
   }
 
