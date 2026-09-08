@@ -74,6 +74,36 @@ export class WalletsService {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
+        include: {
+          transfer: {
+            include: {
+              senderWallet: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                      email: true,
+                      avatarUrl: true,
+                    },
+                  },
+                },
+              },
+              receiverWallet: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                      email: true,
+                      avatarUrl: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       }),
       this.prisma.transaction.count({ where }),
     ]);
